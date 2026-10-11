@@ -111,6 +111,8 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
             findPreference("copy_access_key")?.onPreferenceClickListener = this
             findPreference("purify_story_video_ad")?.onPreferenceClickListener = this
             findPreference("long_press_speed")?.onPreferenceClickListener = this
+            findPreference("half_screen_quality")?.onPreferenceClickListener = this
+            findPreference("full_screen_quality")?.onPreferenceClickListener = this
             checkCompatibleVersion()
             searchItems = retrieve(preferenceScreen)
             checkUpdate()
@@ -195,6 +197,14 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
 
             "pref_import", "pref_export" -> {
                 extra.add(XposedInit.moduleRes.getString(R.string.pref_backup))
+            }
+
+            "half_screen_quality" -> {
+                extra.addAll(XposedInit.moduleRes.getStringArray(R.array.half_screen_quality_entries))
+            }
+
+            "full_screen_quality" -> {
+                extra.addAll(XposedInit.moduleRes.getStringArray(R.array.full_screen_quality_entries))
             }
 
             else -> false
@@ -950,6 +960,24 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
             return true
         }
 
+        private fun onQualityClick(
+            key: String, titleRes: Int, entriesRes: Int, valuesRes: Int
+        ): Boolean {
+            val entries = XposedInit.moduleRes.getStringArray(entriesRes)
+            val values = XposedInit.moduleRes.getStringArray(valuesRes)
+            val current = prefs.getString(key, "0")
+            val checked = values.indexOf(current).coerceAtLeast(0)
+            AlertDialog.Builder(activity).apply {
+                setTitle(XposedInit.moduleRes.getString(titleRes))
+                setSingleChoiceItems(entries, checked) { dialog, which ->
+                    prefs.edit().putString(key, values[which]).apply()
+                    dialog.dismiss()
+                }
+                setNegativeButton(android.R.string.cancel, null)
+            }.show()
+            return true
+        }
+
         @Deprecated("Deprecated in Java")
         override fun onPreferenceClick(preference: Preference) = when (preference.key) {
             "version" -> onVersionClick()
@@ -973,6 +1001,18 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
             "copy_access_key" -> onCopyAccessKeyClick()
             "purify_story_video_ad" -> onPurifyStoryVideoAdClick()
             "long_press_speed" -> onLongPressSpeedClick()
+            "half_screen_quality" -> onQualityClick(
+                "half_screen_quality",
+                R.string.half_screen_quality_title,
+                R.array.half_screen_quality_entries,
+                R.array.half_screen_quality_values
+            )
+            "full_screen_quality" -> onQualityClick(
+                "full_screen_quality",
+                R.string.full_screen_quality_title,
+                R.array.full_screen_quality_entries,
+                R.array.full_screen_quality_values
+            )
             else -> false
         }
     }

@@ -44,7 +44,9 @@ class BiliBiliPackage constructor(private val mClassLoader: ClassLoader, mContex
     private val mHookInfo: Configs.HookInfo = run {
         val (result, time) = measureTimedValue { readHookInfo(mContext) }
         Log.d("load hookinfo $time")
-        Log.d(result.copy { clearMapIds() }.print())
+        if (shouldSaveLog) {
+            Log.d(result.copy { clearMapIds() }.print())
+        }
         result
     }
     val bangumiApiResponseClass by Weak { mHookInfo.bangumiApiResponse from mClassLoader }
@@ -1248,41 +1250,44 @@ class BiliBiliPackage constructor(private val mClassLoader: ClassLoader, mContex
                 class_ = class_ { name = bangumiParamsClass.name }
                 paramsToMap = method {
                     name = bangumiParamsClass.declaredMethods.firstOrNull {
-                        it.returnType == java.util.Map::class.java
+                        java.util.Map::class.java.isAssignableFrom(it.returnType)
                     }?.name ?: return@method
                 }
             }
             gsonHelper = gsonHelper {
-                val gsonClass = dexHelper.findMethodUsingString(
-                    "AssertionError (GSON",
-                    true,
-                    -1,
-                    -1,
-                    null,
-                    -1,
-                    null,
-                    null,
-                    null,
-                    true
-                ).asSequence().firstNotNullOfOrNull {
-                    dexHelper.decodeMethodIndex(it)
-                }?.declaringClass ?: return@gsonHelper
-                val gsonConverterClass =
-                    dexHelper.findField(dexHelper.encodeClassIndex(gsonClass), null, false)
-                        .asSequence().firstNotNullOfOrNull {
-                            dexHelper.decodeFieldIndex(it)?.takeIf { f ->
-                                f.isStatic && f.isFinal && f.isPublic
-                            }?.declaringClass?.takeIf { c ->
-                                c.declaredMethods.any { m ->
-                                    m.returnType == gsonClass && m.isNotStatic
+                val gsonClass = ("com.google.gson.Gson" from classloader)
+                    ?: dexHelper.findMethodUsingString(
+                        "AssertionError (GSON",
+                        true,
+                        -1,
+                        -1,
+                        null,
+                        -1,
+                        null,
+                        null,
+                        null,
+                        true
+                    ).asSequence().firstNotNullOfOrNull {
+                        dexHelper.decodeMethodIndex(it)
+                    }?.declaringClass ?: return@gsonHelper
+                runCatchingOrNull {
+                    val gsonConverterClass =
+                        dexHelper.findField(dexHelper.encodeClassIndex(gsonClass), null, false)
+                            .asSequence().firstNotNullOfOrNull {
+                                dexHelper.decodeFieldIndex(it)?.takeIf { f ->
+                                    f.isStatic && f.isFinal && f.isPublic
+                                }?.declaringClass?.takeIf { c ->
+                                    c.declaredMethods.any { m ->
+                                        m.returnType == gsonClass && m.isNotStatic
+                                    }
                                 }
-                            }
-                        } ?: return@gsonHelper
-                gsonConverter = class_ { name = gsonConverterClass.name }
-                gson = field {
-                    name = gsonConverterClass.declaredMethods.firstOrNull { m ->
-                        m.returnType == gsonClass && m.isNotStatic
-                    }?.name ?: return@field
+                            } ?: return@runCatchingOrNull
+                    gsonConverter = class_ { name = gsonConverterClass.name }
+                    gson = field {
+                        name = gsonConverterClass.declaredMethods.firstOrNull { m ->
+                            m.returnType == gsonClass && m.isNotStatic
+                        }?.name ?: return@field
+                    }
                 }
                 toJson = method {
                     name = gsonClass.declaredMethods.firstOrNull { m ->
@@ -1718,7 +1723,17 @@ class BiliBiliPackage constructor(private val mClassLoader: ClassLoader, mContex
                             .contains("ActivityEntrance")
                     }?.name ?: return@method
                 }
-            }
+            } ?: "com.bilibili.bangumi.data.page.detail.entity.BangumiUniformSeason"
+                .findClassOrNull(classloader)?.let {
+                    // 9.8.0+: "BangumiAllButton" 锚点失效，回退到直接按类名查找
+                    bangumiSeason = class_ { name = it.name }
+                    bangumiSeasonActivityEntrance = method {
+                        name = it.declaredMethods.firstOrNull { m ->
+                            m.parameterTypes.isEmpty() && m.genericReturnType.toString()
+                                .contains("ActivityEntrance")
+                        }?.name ?: return@method
+                    }
+                }
             kanBan = kanBan {
                 val statusClass =
                     "tv.danmaku.bili.ui.kanban.KanBanUserStatus".findClassOrNull(classloader)

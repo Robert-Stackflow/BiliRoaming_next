@@ -73,9 +73,9 @@ class ProtoBufHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     private val blockLiveOrder = hidden && sPrefs.getBoolean("block_live_order", false)
     private val blockWordSearch = hidden && sPrefs.getBoolean("block_word_search", false)
     private val blockModules = hidden && sPrefs.getBoolean("block_modules", false)
-    private val blockUpperRecommendAd = hidden && sPrefs.getBoolean("block_upper_recommend_ad", false)
+    private val blockUpperRecommendAd = sPrefs.getBoolean("block_upper_recommend_ad", true)
     private val blockVideoComment = hidden && sPrefs.getBoolean("block_video_comment", false)
-    private val blockViewPageAds = hidden && sPrefs.getBoolean("block_view_page_ads", false)
+    private val blockViewPageAds = sPrefs.getBoolean("block_view_page_ads", true)
 
 
     override fun startHook() {
@@ -160,7 +160,7 @@ class ProtoBufHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 it.result?.callMethod("clearPools")
             }
         }
-        if (hidden && blockUpperRecommendAd) {
+        if (blockUpperRecommendAd) {
             "com.bapis.bilibili.ad.v1.SourceContentDto".from(mClassLoader)
                 ?.replaceMethod("getAdContent") { null }
         }

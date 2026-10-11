@@ -224,20 +224,12 @@
             android:summary="@string/danmaku_filter_summary"
             android:title="@string/danmaku_filter_title" />
 
-        <ListPreference
-            android:defaultValue="0"
-            android:dependency="main_func"
-            android:entries="@array/half_screen_quality_entries"
-            android:entryValues="@array/half_screen_quality_values"
+        <Preference
             android:key="half_screen_quality"
             android:summary="@string/half_screen_quality_summary"
             android:title="@string/half_screen_quality_title" />
 
-        <ListPreference
-            android:defaultValue="0"
-            android:dependency="main_func"
-            android:entries="@array/full_screen_quality_entries"
-            android:entryValues="@array/full_screen_quality_values"
+        <Preference
             android:key="full_screen_quality"
             android:summary="@string/full_screen_quality_summary"
             android:title="@string/full_screen_quality_title" />
@@ -254,6 +246,24 @@
             android:key="block_comment_guide"
             android:summary="@string/block_comment_guide_summary"
             android:title="@string/block_comment_guide_title" />
+
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="remove_splash_ad"
+            android:summary="@string/remove_splash_ad_summary"
+            android:title="@string/remove_splash_ad_title" />
+
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="remove_home_ads"
+            android:summary="@string/remove_home_ads_summary"
+            android:title="@string/remove_home_ads_title" />
+
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="remove_pause_ad"
+            android:summary="@string/remove_pause_ad_summary"
+            android:title="@string/remove_pause_ad_title" />
 
         <SwitchPreference
             android:key="disable_auto_refresh"
@@ -549,6 +559,63 @@
             android:key="skip_video_ad"
             android:summary="@string/skip_video_ad_summary"
             android:title="@string/skip_video_ad_title" />
+
+        <SwitchPreference
+            android:dependency="hidden"
+            android:defaultValue="true"
+            android:key="skip_video_ad_auto"
+            android:summary="@string/skip_video_ad_auto_summary"
+            android:title="@string/skip_video_ad_auto_title" />
+
+        <SwitchPreference
+            android:dependency="hidden"
+            android:key="skip_video_ad_mute"
+            android:summary="@string/skip_video_ad_mute_summary"
+            android:title="@string/skip_video_ad_mute_title" />
+
+        <SwitchPreference
+            android:dependency="hidden"
+            android:defaultValue="true"
+            android:key="skip_video_ad_toast"
+            android:summary="@string/skip_video_ad_toast_summary"
+            android:title="@string/skip_video_ad_toast_title" />
+
+        <SwitchPreference
+            android:dependency="hidden"
+            android:defaultValue="true"
+            android:key="skip_video_ad_stats"
+            android:summary="@string/skip_video_ad_stats_summary"
+            android:title="@string/skip_video_ad_stats_title" />
+
+        <MultiSelectListPreference
+            android:dependency="hidden"
+            android:defaultValue="@array/skip_video_ad_category_defaults"
+            android:entries="@array/skip_video_ad_category_entries"
+            android:entryValues="@array/skip_video_ad_category_values"
+            android:key="skip_video_ad_categories"
+            android:summary="@string/skip_video_ad_categories_summary"
+            android:title="@string/skip_video_ad_categories_title" />
+
+        <EditTextPreference
+            android:dependency="hidden"
+            android:defaultValue="https://bsbsb.top"
+            android:key="skip_video_ad_server"
+            android:summary="@string/skip_video_ad_server_summary"
+            android:title="@string/skip_video_ad_server_title" />
+
+        <EditTextPreference
+            android:dependency="hidden"
+            android:defaultValue="0"
+            android:key="skip_video_ad_min_duration"
+            android:summary="@string/skip_video_ad_min_duration_summary"
+            android:title="@string/skip_video_ad_min_duration_title" />
+
+        <EditTextPreference
+            android:dependency="hidden"
+            android:defaultValue="0"
+            android:key="skip_video_ad_countdown"
+            android:summary="@string/skip_video_ad_countdown_summary"
+            android:title="@string/skip_video_ad_countdown_title" />
 
         <Preference
             android:key="copy_access_key"

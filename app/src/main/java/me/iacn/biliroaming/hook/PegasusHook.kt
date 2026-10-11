@@ -8,10 +8,17 @@ import me.iacn.biliroaming.utils.json.GsonHelper
 import me.iacn.biliroaming.utils.json.JsonHelper
 import me.iacn.biliroaming.utils.json.getObjectAs
 import me.iacn.biliroaming.utils.json.getObjectAsHelperOrNull
+import me.iacn.biliroaming.utils.json.getObjectOrNull
 import me.iacn.biliroaming.utils.json.toJsonHelper
 
 class PegasusHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     private val hidden = sPrefs.getBoolean("hidden", false)
+
+    // 去除首页广告（无需开启净化推荐流）
+    private val removeHomeAds = sPrefs.getBoolean("remove_home_ads", true)
+
+    @Volatile
+    private var loggedFeedItems = false
 
     private val filterSet = sPrefs.getStringSet("customize_home_recommend", emptySet()).orEmpty()
 
@@ -50,7 +57,7 @@ class PegasusHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         sPrefs.getStringSet("home_filter_keywords_channel", null).orEmpty()
     }
     private val disableAutoRefresh = sPrefs.getBoolean("disable_auto_refresh", false)
-    private val removeRelatePromote = sPrefs.getBoolean("remove_video_relate_promote", false)
+    private val removeRelatePromote = sPrefs.getBoolean("remove_video_relate_promote", true)
     private val removeRelateOnlyAv = sPrefs.getBoolean("remove_video_relate_only_av", false)
     private val removeRelateNothing = sPrefs.getBoolean("remove_video_relate_nothing", false)
     private val applyToRelate = sPrefs.getBoolean("home_filter_apply_to_relate", false)
@@ -517,44 +524,99 @@ class PegasusHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         Log.d("startHook: Pegasus")
 
         fun hookPegasusFeedConvert(json: JsonHelper) {
-            json.getObject("config")!!.apply {
+            json.getObjectOrNull("config")?.apply {
                 disableAutoRefresh()
                 customSmallCoverWhRatio()
             }
-            if (!hidden) return
-            json.getObjectAs<ArrayList<Any>>("items").run {
-                removeAll {
-                    val item = it.toJsonHelper(json.javaClass)
-                    val cardGoto = item.getObjectAs<String?>("card_goto").orEmpty()
-                    val cardType = item.getObjectAs<String?>("card_type").orEmpty()
-                    val goto = item.getObjectAs<String?>("goto").orEmpty()
-                    filter.any {
-                        it in cardGoto || it in cardType || it in goto
-                    } || isLowCountVideo(item) || isContainsBlockKwd(item) || durationVideo(item)
+            if (!hidden && !removeHomeAds) return
+            val items = json.getObjectOrNull("items") as? ArrayList<Any> ?: return
+            val before = items.size
+            items.forEach {
+                val item = it.toJsonHelper(json.javaClass)
+                if (!loggedFeedItems) {
+                    Log.d("pegasus item: card_goto=${item.getObjectAs<String?>("card_goto").orEmpty()} card_type=${item.getObjectAs<String?>("card_type").orEmpty()} goto=${item.getObjectAs<String?>("goto").orEmpty()}")
                 }
-                appendReasons(json.javaClass)
             }
+            if (!loggedFeedItems) loggedFeedItems = true
+            items.removeAll {
+                val item = it.toJsonHelper(json.javaClass)
+                val cardGoto = item.getObjectAs<String?>("card_goto").orEmpty()
+                val cardType = item.getObjectAs<String?>("card_type").orEmpty()
+                val goto = item.getObjectAs<String?>("goto").orEmpty()
+                val isAd = listOf("ad", "cm", "cm_v2", "banner").any {
+                    it in cardGoto || it in cardType || it in goto
+                } || (item.getObjectOrNull("is_ad") as? Boolean) == true
+                        || ((item.getObjectOrNull("cm_mark") as? Int) ?: 0) > 0
+                val shouldRemove = (removeHomeAds && isAd) || (hidden && (filter.any {
+                    it in cardGoto || it in cardType || it in goto
+                } || isLowCountVideo(item) || isContainsBlockKwd(item) || durationVideo(item)))
+                if (shouldRemove && isAd) {
+                    Log.d("removed home ad: card_goto=$cardGoto card_type=$cardType goto=$goto")
+                }
+                shouldRemove
+            }
+            Log.d("pegasus feed filtered: ${before - items.size}/${before} items removed")
+            if (hidden) items.appendReasons(json.javaClass)
         }
 
-        instance.pegasusFeedClass?.hookAfterMethod(
-            "convert",
-            Object::class.java
-        ) { param ->
-            val data = param.result?.getObjectField("data") ?: return@hookAfterMethod
+        val feedConvertHooker: Hooker = hooker@{ param ->
+            val data = param.result?.getObjectField("data") ?: return@hooker
             val json = data.toJsonHelper<FastjsonHelper>()
             hookPegasusFeedConvert(json)
         }
+        instance.pegasusFeedClass?.let { clazz ->
+            // 9.8.0: convert 被 R8 改名（如 e），参数为 ResponseBody，按签名动态查找
+            val methodName = clazz.declaredMethods.firstOrNull {
+                it.parameterTypes.size == 1 && it.parameterTypes[0] == instance.responseBodyClass
+            }?.name ?: instance.pegasusFeed() ?: "convert"
+            clazz.hookAfterMethod(
+                methodName,
+                instance.responseBodyClass ?: Object::class.java,
+                hooker = feedConvertHooker
+            )
+            // 旧版兼容: convert(Object)
+            if (methodName != "convert") {
+                clazz.hookAfterMethod("convert", Object::class.java, hooker = feedConvertHooker)
+            }
+        }
 
-        instance.pegasusParserClass?.hookAfterMethod(
-            "convert",
-            Object::class.java
-        ) { param ->
-            val data = param.result?.getObjectField("data") ?: return@hookAfterMethod
+        val parserConvertHooker: Hooker = hooker@{ param ->
+            val data = param.result?.getObjectField("data") ?: return@hooker
             val json = data.toJsonHelper<GsonHelper>()
             hookPegasusFeedConvert(json)
         }
+        instance.pegasusParserClass?.let { clazz ->
+            val methodName = clazz.declaredMethods.firstOrNull {
+                it.parameterTypes.size == 1 && it.parameterTypes[0] == instance.responseBodyClass
+            }?.name ?: "convert"
+            clazz.hookAfterMethod(
+                methodName,
+                instance.responseBodyClass ?: Object::class.java,
+                hooker = parserConvertHooker
+            )
+            if (methodName != "convert") {
+                clazz.hookAfterMethod("convert", Object::class.java, hooker = parserConvertHooker)
+            }
+        }
 
-        if (!hidden) return
+        // 热门流广告卡片（无需 hidden，随 remove_home_ads 生效）
+        if (removeHomeAds) {
+            instance.popularClass?.hookAfterMethod(
+                if (instance.useNewMossFunc) "executeIndex" else "index",
+                "com.bapis.bilibili.app.show.popular.v1.PopularResultReq"
+            ) { param ->
+                param.result ?: return@hookAfterMethod
+                param.result.callMethod("ensureItemsIsMutable")
+                val items = param.result.callMethodAs<MutableList<Any>>("getItemsList")
+                val beforeCount = items.size
+                items.removeIf {
+                    it.callMethod("getItemCase")?.toString() == "SMALL_COVER_V5_AD"
+                }
+                Log.d("popular ad filtered: ${beforeCount - items.size}/$beforeCount items removed")
+            }
+        }
+
+        if (!hidden && !removeRelatePromote && !removeRelateOnlyAv && !removeRelateNothing && !applyToRelate) return
         fun MutableList<Any>.filter() = removeAll {
             isPromoteRelate(it) || isNotAvRelate(it) || (applyToRelate && (isLowCountRelate(it)
                     || isDurationInvalidRelate(it) || isContainsBlockKwdRelate(it)))
@@ -568,6 +630,9 @@ class PegasusHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                     3, // Resource, like mall
                     4, // GAME
                     5, // CM
+                    6, // COURSE 课程
+                    7, // AI_RECOMMEND
+                    8, // MINI_PROGRAM 小程序
                     10 // SPECIAL
                 ))
             }

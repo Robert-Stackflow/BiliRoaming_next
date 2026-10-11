@@ -1,110 +1,179 @@
 package me.iacn.biliroaming.utils
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONArray
-import org.json.JSONException
-import java.util.concurrent.TimeUnit
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 
-class BilibiliSponsorBlock(
-    private val bvid: String,
-    private val cid: String,
-) {
-    companion object {
-        private const val BASE_URL = "https://bsbsb.top/api/skipSegments/"
-        internal val httpClient by lazy {
-            OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .build()
-        }
-        private val sha256Digest by lazy {
-            java.security.MessageDigest.getInstance("SHA-256")
-        }
-    }
+/**
+ * BiliSponsorBlock 数据层。
+ *
+ * 参考 hanydd/BilibiliSponsorBlock 与 BitStandByYou/BiliSponsorBlock 的协议实现：
+ * 请求 `{server}/api/skipSegments/{sha256(bvid)[0..4)}`，服务端返回该 hash 前缀下
+ * 所有视频的桶，客户端再按完整 videoID 匹配。
+ */
+object BilibiliSponsorBlock {
+    const val DEFAULT_SERVER = "https://bsbsb.top"
 
-    suspend fun getSegments(): List<Segment>? = withContext(Dispatchers.IO) {
-        try {
-            val prefix = bvid.trim().sha256().take(4)
-            val url = "$BASE_URL$prefix?category=sponsor"
+    const val CATEGORY_HIGHLIGHT = "poi_highlight"
+    const val ACTION_SKIP = "skip"
+    const val ACTION_MUTE = "mute"
+    const val ACTION_POI = "poi"
 
-            val request = Request.Builder()
-                .url(url)
-                .header("origin", "BiliRoaming")
-                .header("x-ext-version", "1.7.0")
-                .build()
+    /** 分类的中文显示名，顺序即 UI 展示顺序。 */
+    val categoryNames: Map<String, String> = linkedMapOf(
+        "sponsor" to "赞助/恰饭",
+        "selfpromo" to "自我推广",
+        "interaction" to "互动提醒",
+        "intro" to "开场动画",
+        "outro" to "结束画面",
+        "preview" to "回顾/概要",
+        "music_offtopic" to "非音乐片段",
+        "filler" to "填充内容",
+        CATEGORY_HIGHLIGHT to "精彩时刻",
+    )
 
-            return@withContext httpClient.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    Log.e("HTTP request failed with code: ${resp.code}")
-                    return@use null
-                }
+    /** 默认启用的分类（不含只做标记的精彩时刻）。 */
+    val defaultCategories: Set<String> = setOf(
+        "sponsor", "selfpromo", "interaction", "intro",
+        "outro", "preview", "music_offtopic", "filler",
+    )
 
-                val body = resp.body.string()
-                if (body.isEmpty()) {
-                    Log.e("HTTP request failed with empty body")
-                    return@use null
-                }
-
-                parseSegments(body)
-            }
-
-        } catch (e: Exception) {
-            Log.e(e)
-            null
-        }
-    }
-
-    private fun parseSegments(json: String): List<Segment>? {
-        try {
-            val jsonArray = JSONArray(json)
-            val segments = mutableListOf<Segment>()
-            if (jsonArray.length() == 0) return null
-
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                if (obj.optString("videoID") != bvid) continue
-
-                val segmentsArray = obj.getJSONArray("segments")
-                for (j in 0 until segmentsArray.length()) {
-                    val item = segmentsArray.getJSONObject(j)
-                    val segmentArray = item.getJSONArray("segment")
-                    segments.add(
-                        Segment(
-                            segment = floatArrayOf(
-                                segmentArray.getDouble(0).toFloat(),
-                                segmentArray.getDouble(1).toFloat()
-                            ),
-                            cid = item.optString("cid"),
-                            UUID = item.optString("UUID"),
-                            category = item.optString("category"),
-                            actionType = item.optString("actionType"),
-                            videoDuration = item.optInt("videoDuration")
-                        )
-                    )
-                }
-                break
-            }
-            return segments
-                .filter { it.cid == this.cid }
-                .sortedBy { it.segment[0] }
-        } catch (_: JSONException) {
-            return null
-        }
-    }
-
-    private fun String.sha256(): String = sha256Digest
-        .digest(toByteArray())
-        .joinToString("") { "%02x".format(it) }
+    fun displayName(category: String): String = categoryNames[category] ?: category
 
     data class Segment(
-        val segment: FloatArray,
-        val cid: String,
-        val UUID: String,
         val category: String,
         val actionType: String,
-        val videoDuration: Int
-    )
+        val startMs: Long,
+        val endMs: Long,
+        val uuid: String,
+        val description: String = "",
+    ) {
+        val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0L)
+    }
+
+    private class CacheEntry(val timeMs: Long, val segments: List<Segment>)
+
+    private val cache = ConcurrentHashMap<String, CacheEntry>()
+
+    private const val CACHE_TTL_MS = 30 * 60 * 1000L
+    private const val MIN_SEGMENT_MS = 250L
+    private const val MAX_SEGMENT_SECONDS = 86_400.0
+    private const val CONNECT_TIMEOUT_MS = 5_000
+    private const val READ_TIMEOUT_MS = 5_000
+
+    /** 命中未过期的进程内缓存时返回，否则返回 null。 */
+    fun cached(bvid: String, cid: String): List<Segment>? {
+        val entry = cache["$bvid:$cid"] ?: return null
+        if (System.currentTimeMillis() - entry.timeMs > CACHE_TTL_MS) return null
+        return entry.segments
+    }
+
+    fun hasCached(bvid: String, cid: String): Boolean = cached(bvid, cid) != null
+
+    fun clear(bvid: String, cid: String) {
+        cache.remove("$bvid:$cid")
+    }
+
+    /**
+     * 拉取并缓存该视频的片段。网络/解析失败返回空列表（并缓存空结果，避免频繁重试）。
+     */
+    fun fetch(
+        bvid: String,
+        cid: String,
+        server: String,
+        enabledCategories: Set<String>,
+    ): List<Segment> {
+        val segments = try {
+            val prefix = sha256(bvid).take(4)
+            val url = URL("${server.trimEnd('/')}/api/skipSegments/$prefix")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                setRequestProperty("Origin", "BiliRoaming")
+                setRequestProperty("X-EXT-VERSION", "1.7.0")
+            }
+            try {
+                val status = conn.responseCode
+                if (status !in 200..299) {
+                    Log.e("SponsorBlock fetch HTTP $status for $bvid")
+                    emptyList()
+                } else {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    parse(body, bvid, enabledCategories)
+                }
+            } finally {
+                conn.disconnect()
+            }
+        } catch (e: Exception) {
+            Log.e(e)
+            emptyList()
+        }
+        cache["$bvid:$cid"] = CacheEntry(System.currentTimeMillis(), segments)
+        return segments
+    }
+
+    private fun parse(raw: String, bvid: String, enabledCategories: Set<String>): List<Segment> {
+        if (raw.isBlank()) return emptyList()
+        val result = mutableListOf<Segment>()
+        val buckets = JSONArray(raw)
+        for (i in 0 until buckets.length()) {
+            val bucket = buckets.optJSONObject(i) ?: continue
+            if (bucket.optString("videoID") != bvid) continue
+            val array = bucket.optJSONArray("segments") ?: continue
+            for (j in 0 until array.length()) {
+                val obj = array.optJSONObject(j) ?: continue
+                parseSegment(obj, enabledCategories)?.let { result += it }
+            }
+            break
+        }
+        return result.sortedBy { it.startMs }
+    }
+
+    private fun parseSegment(json: JSONObject, enabledCategories: Set<String>): Segment? {
+        val segmentArray = json.optJSONArray("segment") ?: return null
+        val category = optStringOrNull(json, "category")?.takeIf { it.isNotBlank() } ?: "sponsor"
+        val actionType = optStringOrNull(json, "actionType")?.takeIf { it.isNotBlank() } ?: ACTION_SKIP
+        if (category !in enabledCategories) return null
+        if (actionType != ACTION_SKIP && actionType != ACTION_MUTE && actionType != ACTION_POI) return null
+
+        // UUID 是去重 key，缺失直接丢弃该片段。
+        val uuid = optStringOrNull(json, "UUID")?.takeIf { it.isNotBlank() }
+            ?: optStringOrNull(json, "uuid")?.takeIf { it.isNotBlank() }
+            ?: return null
+
+        val isFullOrPoi = actionType == "full" || actionType == ACTION_POI
+        if (segmentArray.length() < if (isFullOrPoi) 1 else 2) return null
+
+        val startSec = segmentArray.optDouble(0, Double.NaN)
+        val endSec = if (segmentArray.length() > 1) segmentArray.optDouble(1, Double.NaN) else startSec
+        if (!startSec.isFinite()) return null
+        if (startSec > MAX_SEGMENT_SECONDS || endSec > MAX_SEGMENT_SECONDS) return null
+
+        val startMs = (startSec * 1000.0).toLong()
+        val endMs = (endSec * 1000.0).toLong()
+        if (startMs < 0L) return null
+        if (endMs > startMs && endMs - startMs < MIN_SEGMENT_MS) return null
+        if (endMs < startMs) return null
+
+        return Segment(
+            category = category,
+            actionType = actionType,
+            startMs = startMs,
+            endMs = endMs,
+            uuid = uuid,
+            description = optStringOrNull(json, "description") ?: "",
+        )
+    }
+
+    private fun optStringOrNull(json: JSONObject, key: String): String? =
+        if (json.isNull(key)) null else json.optString(key)
+
+    private val digest by lazy { MessageDigest.getInstance("SHA-256") }
+
+    private fun sha256(text: String): String =
+        digest.digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
 }

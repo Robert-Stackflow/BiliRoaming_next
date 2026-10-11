@@ -325,4 +325,36 @@
         <item>1.777778</item>
         <item>1.333333</item>
     </string-array>
+    <string-array name="skip_video_ad_category_entries">
+        <item>赞助/恰饭</item>
+        <item>自我推广</item>
+        <item>互动提醒</item>
+        <item>开场动画</item>
+        <item>结束画面</item>
+        <item>回顾/概要</item>
+        <item>非音乐片段</item>
+        <item>填充内容</item>
+        <item>精彩时刻（仅标记）</item>
+    </string-array>
+    <string-array name="skip_video_ad_category_values">
+        <item>sponsor</item>
+        <item>selfpromo</item>
+        <item>interaction</item>
+        <item>intro</item>
+        <item>outro</item>
+        <item>preview</item>
+        <item>music_offtopic</item>
+        <item>filler</item>
+        <item>poi_highlight</item>
+    </string-array>
+    <string-array name="skip_video_ad_category_defaults">
+        <item>sponsor</item>
+        <item>selfpromo</item>
+        <item>interaction</item>
+        <item>intro</item>
+        <item>outro</item>
+        <item>preview</item>
+        <item>music_offtopic</item>
+        <item>filler</item>
+    </string-array>
 </resources>

@@ -2,8 +2,10 @@
 
 package me.iacn.biliroaming.utils
 
+import android.app.AndroidAppHelper
 import android.content.res.XResources
 import dalvik.system.BaseDexClassLoader
+import dalvik.system.PathClassLoader
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XC_MethodHook.MethodHookParam
 import de.robv.android.xposed.XC_MethodReplacement
@@ -472,13 +474,28 @@ inline fun ClassLoader.findDexClassLoader(crossinline delegator: (BaseDexClassLo
 }
 
 inline fun ClassLoader.allClassesList(crossinline delegator: (BaseDexClassLoader) -> BaseDexClassLoader = { x -> x }): List<String> {
-    return findDexClassLoader(delegator)?.getObjectField("pathList")
+    val primary = findDexClassLoader(delegator)?.dexClassNames().orEmpty()
+    if (primary.isNotEmpty()) return primary
+    // 9.8.0+ Tribe 类加载器结构改造后，反射枚举 dexElements 可能失败，
+    // 回退到直接基于 base.apk 构造 PathClassLoader 枚举全部类
+    return runCatchingOrNull {
+        val sourceDir = AndroidAppHelper.currentApplication()
+            ?.applicationInfo?.sourceDir ?: return@runCatchingOrNull primary
+        val fallbackLoader = PathClassLoader(sourceDir, this)
+        findDexClassLoader { fallbackLoader }?.dexClassNames().orEmpty()
+    } ?: primary
+}
+
+fun BaseDexClassLoader.dexClassNames(): List<String> = runCatchingOrNull {
+    getObjectField("pathList")
         ?.getObjectFieldAs<Array<Any>>("dexElements")
         ?.flatMap {
-            it.getObjectField("dexFile")?.callMethodAs<Enumeration<String>>("entries")?.toList()
+            it.getObjectField("dexFile")
+                ?.callMethodAs<Enumeration<String>>("entries")
+                ?.toList()
                 .orEmpty()
         }.orEmpty()
-}
+} ?: emptyList()
 
 val Member.isStatic: Boolean
     inline get() = Modifier.isStatic(modifiers)

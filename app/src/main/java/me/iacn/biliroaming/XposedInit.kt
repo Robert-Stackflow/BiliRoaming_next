@@ -10,6 +10,7 @@ import android.os.Build
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -56,6 +57,10 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     Log.d("Bilibili version: ${getPackageVersion(lpparam.packageName)} (${if (is64) "64" else "32"}bit)")
                     Log.d("SDK: ${Build.VERSION.RELEASE}(${Build.VERSION.SDK_INT}); Phone: ${Build.BRAND} ${Build.MODEL}")
                     Log.d("Config: ${sPrefs.all}")
+                    XposedBridge.log(
+                        "BiliRoaming ${BuildConfig.VERSION_NAME} loaded in ${lpparam.processName}, " +
+                                "bilibili ${getPackageVersion(lpparam.packageName)}"
+                    )
                     Log.toast(
                         "哔哩漫游已激活${
                             if (sPrefs.getBoolean("main_func", false) &&
@@ -95,6 +100,7 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     startHook { AutoLikeHook(lpparam.classLoader) }
                     startHook { SettingHook(lpparam.classLoader) }
                     startHook { SplashHook(lpparam.classLoader) }
+                    startHook { AdBlockHook(lpparam.classLoader) }
                     startHook { EnvHook(lpparam.classLoader) }
                     startHook { DownloadThreadHook(lpparam.classLoader) }
                     startHook { MusicNotificationHook(lpparam.classLoader) }
@@ -184,23 +190,18 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
     }
 
     private fun startLog() = try {
+        // 日志直接写入文件，不依赖 logcat 子进程（部分机型/新系统上 logcat exec 会静默失败）
         if (logFile.exists()) {
             if (oldLogFile.exists()) {
                 oldLogFile.delete()
             }
             logFile.renameTo(oldLogFile)
         }
+        logFile.parentFile?.mkdirs()
         logFile.delete()
         logFile.createNewFile()
-        Runtime.getRuntime().exec(
-            arrayOf(
-                "logcat",
-                "-T",
-                "100",
-                "-f",
-                logFile.absolutePath
-            )
-        )
+        Log.fileLoggingEnabled = true
+        XposedBridge.log("BiliRoaming log file: ${logFile.absolutePath}")
     } catch (e: Throwable) {
         Log.e(e)
         null

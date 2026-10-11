@@ -8,7 +8,8 @@ class SplashShowProcessor : GsonProcessor {
         "tv.danmaku.bili.splash.ad.model.SplashShowResponse"
 
     override fun shouldEnable() =
-        sPrefs.getBoolean("hidden", false) && sPrefs.getBoolean("purify_splash", false)
+        sPrefs.getBoolean("remove_splash_ad", true)
+                || (sPrefs.getBoolean("hidden", false) && sPrefs.getBoolean("purify_splash", false))
 
     override fun process(result: Any) {
         result.getObjectFieldOrNullAs<MutableList<*>>("strategyList")?.clear()

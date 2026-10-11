@@ -2,6 +2,8 @@ package me.iacn.biliroaming.hook
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.text.SpannableStringBuilder
@@ -23,12 +25,23 @@ class CopyHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             "dy_opus_copy_right_id",
             "dy_opus_paragraph_text",
         )
+
+        // 简介视图 -> 完整简介文本
+        private val descFullText = java.util.WeakHashMap<View, String>()
     }
 
     private val enhanceLongClickCopy = sPrefs.getBoolean("comment_copy_enhance", false)
 
     override fun startHook() {
         if (!sPrefs.getBoolean("comment_copy", false)) return
+
+        // 诊断：记录 Activity 类名 + WebView 加载的 URL，判断动态详情是 Compose 还是 H5
+        android.app.Activity::class.java.hookAfterMethod("onResume") { param ->
+            Log.d("CopyHook: Activity onResume ${param.thisObject.javaClass.name}")
+        }
+        android.webkit.WebView::class.java.hookAfterMethod("loadUrl", String::class.java) { param ->
+            Log.d("CopyHook: WebView loadUrl ${param.args[0]}")
+        }
         instance.descCopyView().zip(instance.descCopy()).forEach { p ->
             val clazz = p.first ?: return@forEach
             val method = p.second ?: return@forEach
@@ -48,10 +61,59 @@ class CopyHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             }
         }
 
+        // 9.8.0+: 视频简介视图为 tv.danmaku.bili.videopage.common.widget.view.ExpandableTextView，
+        // 不再自带复制监听器，且原 (View, ClickableSpan) 渲染方法已不存在。
+        // 在简介文本 setter 触发时捕获全文，并拦截 performLongClick 弹复制对话框
+        if (enhanceLongClickCopy) {
+            "tv.danmaku.bili.videopage.common.widget.view.ExpandableTextView"
+                .findClassOrNull(mClassLoader)?.let { clazz ->
+                    Log.d("hooked desc copy view: ${clazz.name}")
+                    listOf("T", "setOriginText", "setExpandedDesc", "setRetractedDesc").forEach { name ->
+                        clazz.hookAfterAllMethods(name) { param ->
+                            val view = param.thisObject as? View ?: return@hookAfterAllMethods
+                            val text = extractDescText(param.args.getOrNull(0))
+                            if (text != null) descFullText[view] = text.toString()
+                        }
+                    }
+                    val longClickHooker: Hooker = hooker@{ param ->
+                        val view = param.thisObject as? View ?: return@hooker
+                        val text = descFullText[view]?.takeIf { it.isNotEmpty() }
+                            ?: runCatchingOrNull {
+                                (view.callMethodOrNull("getTextBuilder")?.callMethodOrNull("a")) as? CharSequence
+                            }?.takeIf { !it.isNullOrEmpty() }
+                            ?: runCatchingOrNull {
+                                view.getFirstFieldByExactTypeOrNull<CharSequence>() as? CharSequence
+                            }?.takeIf { !it.isNullOrEmpty() }
+                            ?: (view as? TextView)?.text?.takeIf { !it.isNullOrEmpty() }
+                        Log.d("desc performLongClick fired: textLen=${text?.length ?: -1}")
+                        if (text.isNullOrEmpty()) return@hooker
+                        showLongPressCopyDialog(view.context, text)
+                        param.result = true
+                    }
+                    clazz.hookBeforeMethod("performLongClick", hooker = longClickHooker)
+                    if (runCatchingOrNull {
+                            clazz.getDeclaredMethod(
+                                "performLongClick",
+                                Float::class.javaPrimitiveType,
+                                Float::class.javaPrimitiveType
+                            )
+                        } != null
+                    ) {
+                        clazz.hookBeforeMethod(
+                            "performLongClick",
+                            Float::class.javaPrimitiveType,
+                            Float::class.javaPrimitiveType,
+                            hooker = longClickHooker
+                        )
+                    }
+                }
+        }
+
         instance.dynamicDescHolderListeners().forEach { c ->
             c?.replaceMethod("onLongClick", View::class.java) { param ->
                 if (!enhanceLongClickCopy)
                     return@replaceMethod true
+                Log.d("CopyHook: dynamicDesc onLongClick holder=${c?.name}")
                 val itemView = param.args[0] as? View
                 DYNAMIC_COPYABLE_IDS.asSequence().firstNotNullOfOrNull { n ->
                     getId(n).takeIf { it != 0 }?.let { itemView?.findViewById<TextView>(it) }
@@ -98,6 +160,34 @@ class CopyHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                         }
                         return@replaceAllMethods true
                     }
+                }
+            }
+        }
+
+        // 9.8.0+: 评论内容渲染改为 Compose/新 holder，内容视图为 RichTextView，
+        // 原 CommentContentRichTextHandler 已不存在，长按复制增强直接挂载在 setText 上
+        if (enhanceLongClickCopy) {
+            "com.bilibili.app.comment3.ui.widget.RichTextView".findClassOrNull(mClassLoader)
+                ?.hookAfterMethod(
+                    "setText",
+                    CharSequence::class.java,
+                    TextView.BufferType::class.java
+                ) { param ->
+                    (param.thisObject as? View)?.setOnLongClickListener { v ->
+                        Log.d("CopyHook: RichTextView longClick class=${v.javaClass.name} textLen=${(v as? TextView)?.text?.length ?: -1}")
+                        (v as? TextView)?.text?.let { text ->
+                            showLongPressCopyDialog(v.context, text)
+                        }
+                        true
+                    }
+                }
+
+            // 诊断：记录动态/评论相关 View 的长按类名，定位动态正文与动态评论控件
+            val loggedLongClickClasses = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+            View::class.java.hookAfterMethod("performLongClick") { param ->
+                val cls = param.thisObject.javaClass.name
+                if (loggedLongClickClasses.add(cls)) {
+                    Log.d("CopyHook: performLongClick class=$cls")
                 }
             }
         }
@@ -155,6 +245,44 @@ class CopyHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 ?.callMethodOrNull("dismiss")
 
             param.result = null
+        }
+    }
+
+    private fun extractDescText(arg: Any?): CharSequence? {
+        arg ?: return null
+        runCatchingOrNull {
+            arg.getFirstFieldByExactTypeOrNull<CharSequence>() as? CharSequence
+        }?.takeIf { it.isNotEmpty() }?.let { return it }
+        return runCatchingOrNull {
+            arg.callMethodOrNull("a") as? CharSequence
+        }?.takeIf { !it.isNullOrEmpty() }
+    }
+
+    private fun showLongPressCopyDialog(context: Context, text: CharSequence) {
+        val appDialogTheme = getResId("AppTheme.Dialog.Alert", "style")
+        AlertDialog.Builder(context, appDialogTheme).run {
+            setTitle("自由复制内容")
+            setMessage(text)
+            setPositiveButton("分享") { _, _ ->
+                context.startActivity(
+                    Intent.createChooser(
+                        Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, text)
+                            type = "text/plain"
+                        }, "分享评论内容"
+                    )
+                )
+            }
+            setNeutralButton("复制全部") { _, _ ->
+                val clipboard =
+                    context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("comment", text))
+            }
+            setNegativeButton(android.R.string.cancel, null)
+            show()
+        }.apply {
+            findViewById<TextView>(android.R.id.message).setTextIsSelectable(true)
         }
     }
 

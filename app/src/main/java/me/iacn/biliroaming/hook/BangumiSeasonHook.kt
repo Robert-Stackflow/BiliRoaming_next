@@ -217,15 +217,46 @@ class BangumiSeasonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             }
         }
 
-        "com.bilibili.bangumi.ui.page.detail.BangumiDetailActivityV3".hookAfterMethod(
-            mClassLoader, "onCreate", Bundle::class.java
-        ) {
-            setErrorMessage(it.thisObject as Activity)
+        val bangumiDetailActivityV3Class =
+            "com.bilibili.bangumi.ui.page.detail.BangumiDetailActivityV3".findClassOrNull(
+                mClassLoader
+            )
+        val errorMessageHooker: Hooker = {
+            val activity = it.thisObject
+            if (bangumiDetailActivityV3Class == null ||
+                bangumiDetailActivityV3Class.isInstance(activity)
+            ) setErrorMessage(activity as Activity)
         }
-        "com.bilibili.bangumi.ui.page.detail.BangumiDetailActivityV3".hookAfterMethod(
-            mClassLoader, "onConfigurationChanged", Configuration::class.java
+        if (bangumiDetailActivityV3Class != null &&
+            runCatchingOrNull {
+                bangumiDetailActivityV3Class.getDeclaredMethod("onCreate", Bundle::class.java)
+            } != null
         ) {
-            setErrorMessage(it.thisObject as Activity)
+            bangumiDetailActivityV3Class.hookAfterMethod(
+                "onCreate", Bundle::class.java, hooker = errorMessageHooker
+            )
+        } else {
+            // 9.8.0+: onCreate 上移至 BaseToolbarActivity
+            "com.bilibili.lib.ui.BaseToolbarActivity".findClassOrNull(mClassLoader)
+                ?.hookAfterMethod("onCreate", Bundle::class.java, hooker = errorMessageHooker)
+        }
+        if (bangumiDetailActivityV3Class != null &&
+            runCatchingOrNull {
+                bangumiDetailActivityV3Class.getDeclaredMethod(
+                    "onConfigurationChanged", Configuration::class.java
+                )
+            } != null
+        ) {
+            bangumiDetailActivityV3Class.hookAfterMethod(
+                "onConfigurationChanged", Configuration::class.java, hooker = errorMessageHooker
+            )
+        } else {
+            // 9.8.0+: onConfigurationChanged 上移至 BaseAppCompatActivity
+            "com.bilibili.lib.ui.BaseAppCompatActivity".findClassOrNull(mClassLoader)
+                ?.hookAfterMethod(
+                    "onConfigurationChanged", Configuration::class.java,
+                    hooker = errorMessageHooker
+                )
         }
 
         if (isBuiltIn && is64 && Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {

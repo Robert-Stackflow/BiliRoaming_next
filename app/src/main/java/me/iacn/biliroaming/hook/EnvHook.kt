@@ -11,7 +11,7 @@ class EnvHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         Log.d("startHook: Env")
 
         // EnvContext
-        instance.preBuiltConfigClass?.let {
+        instance.preBuiltConfigClass?.let { clazz ->
             val hooker: Hooker = hooker@ { param ->
                 @Suppress("UNCHECKED_CAST")
                 val result = param.result as? MutableMap<String, String?> ?: return@hooker
@@ -20,14 +20,27 @@ class EnvHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                         ?: result.remove(config.key)
                 }
             }
-            // v8.28.0 - ?
-            runCatching { it.hookAfterMethod(instance.getPreBuiltConfigMethod(), hooker = hooker) }
-            // ? - v8.48.0 ..
-            runCatching { it.hookAfterMethod(instance.getPreBuiltConfigMethod(), it, hooker = hooker) }
+            // v8.28.0 - ? 实例无参方法
+            // ? - v8.48.0 .. 静态 (clazz) -> Map 方法（9.8.0 为 t(EnvContext)）
+            instance.getPreBuiltConfigMethod()?.let { methodName ->
+                val noArgMethod = clazz.declaredMethods.firstOrNull {
+                    it.name == methodName && it.parameterTypes.isEmpty()
+                }
+                val staticThisMethod = clazz.declaredMethods.firstOrNull {
+                    it.name == methodName && it.parameterTypes.size == 1 &&
+                            it.parameterTypes[0] == clazz
+                }
+                when {
+                    noArgMethod != null ->
+                        runCatching { clazz.hookAfterMethod(methodName, hooker = hooker) }
+                    staticThisMethod != null ->
+                        runCatching { clazz.hookAfterMethod(methodName, clazz, hooker = hooker) }
+                }
+            }
         }
 
         // TypedContext
-        instance.dataSPClass?.let {
+        instance.dataSPClass?.let { clazz ->
             val hooker: Hooker = hooker@ { param ->
                 val result = param.result as? SharedPreferences ?: return@hooker
                 if (!result.contains("bv.enable_bv")) return@hooker
@@ -37,10 +50,23 @@ class EnvHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                     } ?: result.edit().remove(config.key).apply()
                 }
             }
-            // v8.28.0 - ?
-            runCatching { it.hookAfterMethod(instance.getDataSPMethod(), hooker = hooker) }
-            // ? - v8.48.0 ..
-            runCatching { it.hookAfterMethod(instance.getDataSPMethod(), it, hooker = hooker) }
+            // v8.28.0 - ? 实例无参方法
+            // ? - v8.48.0 .. 静态 (clazz) -> SharedPreferences 方法（9.8.0 为 f(TypedContext)）
+            instance.getDataSPMethod()?.let { methodName ->
+                val noArgMethod = clazz.declaredMethods.firstOrNull {
+                    it.name == methodName && it.parameterTypes.isEmpty()
+                }
+                val staticThisMethod = clazz.declaredMethods.firstOrNull {
+                    it.name == methodName && it.parameterTypes.size == 1 &&
+                            it.parameterTypes[0] == clazz
+                }
+                when {
+                    noArgMethod != null ->
+                        runCatching { clazz.hookAfterMethod(methodName, hooker = hooker) }
+                    staticThisMethod != null ->
+                        runCatching { clazz.hookAfterMethod(methodName, clazz, hooker = hooker) }
+                }
+            }
         }
 
         "com.bilibili.lib.blconfig.internal.OverrideConfig".findClassOrNull(mClassLoader)
