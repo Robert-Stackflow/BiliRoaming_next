@@ -21,6 +21,8 @@ class BangumiPageAdHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         // activity toast ad
         "com.bilibili.bangumi.data.page.detail.entity.OGVActivityVo".from(mClassLoader)
             ?.hookBeforeAllConstructors(oGVActivityVoHooker)
+        "com.bilibili.ship.theseus.ogv.activity.OgvActivityVo".from(mClassLoader)
+            ?.hookBeforeAllConstructors(oGVActivityVoHooker)
         "com.bilibili.ship.theseus.ogv.activity.OGVActivityVo".from(mClassLoader)
             ?.hookBeforeAllConstructors(oGVActivityVoHooker)
 

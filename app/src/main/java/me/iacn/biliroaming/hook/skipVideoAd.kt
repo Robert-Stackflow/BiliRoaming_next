@@ -105,14 +105,20 @@ class SkipVideoAd(classLoader: ClassLoader) : BaseHook(classLoader) {
         }
 
         instance.playerCoreServiceV2Class?.apply {
-            hookAfterMethod("G1", Int::class.java) { param ->
-                playerRef = WeakReference(param.thisObject)
-                val state = param.args[0] as Int
-                if (state in 3..5 && duration <= 0) {
-                    duration = (player?.callMethodAs<Int>("getDuration") ?: -1).toLong()
-                }
-                if (state == 2) {
-                    onVideoStart()
+            val stateMethod = declaredMethods.firstOrNull {
+                (it.name == "G1" || it.name == "r") && it.parameterTypes.size == 1 &&
+                    it.parameterTypes[0] == Int::class.javaPrimitiveType
+            }?.name
+            stateMethod?.let { name ->
+                hookAfterMethod(name, Int::class.java) { param ->
+                    playerRef = WeakReference(param.thisObject)
+                    val state = param.args[0] as Int
+                    if (state in 3..5 && duration <= 0) {
+                        duration = (player?.callMethodAs<Int>("getDuration") ?: -1).toLong()
+                    }
+                    if (state == 2) {
+                        onVideoStart()
+                    }
                 }
             }
 

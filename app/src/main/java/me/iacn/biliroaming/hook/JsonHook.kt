@@ -34,8 +34,10 @@ class JsonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             )
         val defaultWordClass =
             "tv.danmaku.bili.ui.main2.api.SearchDefaultWord".findClassOrNull(mClassLoader)
+                ?: "tv.danmaku.bili.khomeapi.frame.SearchDefaultWord".findClassOrNull(mClassLoader)
         val defaultKeywordClass =
             "com.bilibili.search.api.DefaultKeyword".findClassOrNull(mClassLoader)
+                ?: "com.bilibili.search2.api.DefaultKeyword".findClassOrNull(mClassLoader)
         val brandSplashDataClass =
             "tv.danmaku.bili.ui.splash.brand.BrandSplashData".findClassOrNull(mClassLoader)
                 ?: "tv.danmaku.bili.ui.splash.brand.model.BrandSplashData".findClassOrNull(mClassLoader)
@@ -56,6 +58,7 @@ class JsonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             "tv.danmaku.bili.ui.offline.api.OgvApiResponseV2".findClassOrNull(mClassLoader)
         val dmAdvertClass =
             "com.bilibili.ad.adview.videodetail.danmakuv2.model.DmAdvert".from(mClassLoader)
+                ?: "com.bilibili.adcommon.data.model.DmAdvert".from(mClassLoader)
         val liveShoppingInfoClass =
             "com.bilibili.bililive.room.biz.shopping.beans.LiveShoppingInfo".from(mClassLoader)
         val liveGoodsCardInfoClass =

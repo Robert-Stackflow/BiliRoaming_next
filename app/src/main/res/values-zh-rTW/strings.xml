@@ -9,8 +9,8 @@
     <string name="not_running_summary">嗶哩漫遊未啟動</string>
     <string name="runtime_xposed">執行環境：Xposed</string>
     <string name="runtime_taichi">執行環境：太極</string>
-    <string name="main_func_title">解鎖番劇限制</string>
-    <string name="main_func_summary">使用戶可以觀看區域外版權番劇</string>
+    <string name="main_func_title">啟用模組功能</string>
+    <string name="main_func_summary">總開關：啟用番劇解鎖、清晰度、廣告過濾等功能，關閉後大部分功能不生效</string>
     <string name="hide_icon_title">隱藏桌面圖示</string>
     <string name="hide_icon_summary">不顯示本程式在啟動器中的圖示</string>
     <string name="custom_theme_title">自訂主題色</string>

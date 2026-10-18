@@ -2495,12 +2495,25 @@ class BiliBiliPackage constructor(private val mClassLoader: ClassLoader, mContex
             }
             rewardAd = rewardAd {
                 val rewardAdActivityClass =
-                    "com.bilibili.ad.reward.RewardAdActivity".from(classloader) ?: return@rewardAd
+                    "com.bilibili.ad.reward.activity.RewardAdActivity".from(classloader)
+                        ?: "com.bilibili.ad.reward.RewardAdActivity".from(classloader)
+                        ?: return@rewardAd
 
-                class_ = class_ { name = rewardAdActivityClass.name }
-                val rewardFlagField =
-                    rewardAdActivityClass.declaredFields.filter { it.type == Boolean::class.javaPrimitiveType }
-                        .getOrNull(1) ?: return@rewardAd
+                // onCreate 在父类 BaseRewardAdActivity 中，hook 父类避免 NoSuchMethodError
+                val rewardAdHookClass =
+                    "com.bilibili.ad.reward.activity.BaseRewardAdActivity".from(classloader)
+                        ?: rewardAdActivityClass
+                class_ = class_ { name = rewardAdHookClass.name }
+                // 9.14/9.8: RewardAdActivity 继承自 BaseRewardAdActivity，标志位在父类中
+                var clazz: Class<*>? = rewardAdActivityClass
+                val rewardFlagFields = mutableListOf<java.lang.reflect.Field>()
+                while (clazz != null) {
+                    rewardFlagFields += clazz.declaredFields.filter {
+                        it.type == Boolean::class.javaPrimitiveType
+                    }
+                    clazz = clazz.superclass
+                }
+                val rewardFlagField = rewardFlagFields.getOrNull(1) ?: return@rewardAd
 
                 rewardFlag = field { name = rewardFlagField.name }
 

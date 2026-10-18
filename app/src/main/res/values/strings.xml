@@ -9,8 +9,8 @@
     <string name="not_running_summary">哔哩漫游未激活</string>
     <string name="runtime_xposed">运行环境：Xposed</string>
     <string name="runtime_taichi">运行环境：太极</string>
-    <string name="main_func_title">解锁番剧限制</string>
-    <string name="main_func_summary">使用户可以观看区域外版权番剧</string>
+    <string name="main_func_title">启用模块功能</string>
+    <string name="main_func_summary">总开关：启用番剧解锁、清晰度、广告过滤等功能，关闭后大部分功能不生效</string>
     <string name="hide_icon_title">隐藏桌面图标</string>
     <string name="hide_icon_summary">不显示本应用在启动器中的图标</string>
     <string name="custom_theme_title">自定义主题色</string>

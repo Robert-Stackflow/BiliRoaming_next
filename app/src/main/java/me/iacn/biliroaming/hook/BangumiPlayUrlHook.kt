@@ -289,12 +289,23 @@ class BangumiPlayUrlHook(classLoader: ClassLoader) : BaseHook(classLoader) {
 
         instance.playerMossClass?.run {
             var isDownload = false
+            var lastBvid: String? = null
             hookBeforeMethod(
                 if (instance.useNewMossFunc) "executePlayViewUnite" else "playViewUnite",
                 instance.playViewUniteReqClass
             ) { param ->
                 val request = param.args[0]
+                val bvid = request.callMethod("getBvid") as? String
+                // 换视频时重置，避免首页预加载把 qnApplied 消耗掉
+                if (!bvid.isNullOrEmpty() && bvid != lastBvid) {
+                    lastBvid = bvid
+                    qnApplied.set(false)
+                }
                 val vod = request.callMethod("getVod") ?: return@hookBeforeMethod
+                Log.d(
+                    "PlayerMoss before: bvid=$bvid qn=${vod.callMethodAs<Long>("getQn")} " +
+                            "half=$halfScreenQuality full=$fullScreenQuality"
+                )
                 isDownload = sPrefs.getBoolean("allow_download", false)
                         && vod.callMethodAs<Int>("getDownload") >= 1
                 if (isDownload) {
@@ -309,13 +320,17 @@ class BangumiPlayUrlHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                     // unlock available quality limit, allow quality up to 8K
                     vod.callMethod("setFnval", MAX_FNVAL)
                     vod.callMethod("setFourk", true)
-                    if (halfScreenQuality != 0 && qnApplied.compareAndSet(false, true)) {
+                    // qn == 0 表示自动画质；手动切清晰度时 qn != 0，不覆盖
+                    if (halfScreenQuality != 0 &&
+                        (vod.callMethodAs<Long>("getQn") == 0L || qnApplied.compareAndSet(false, true))
+                    ) {
                         if (halfScreenQuality != 1) {
                             vod.callMethod("setQn", halfScreenQuality)
                         } else {
                             // follow full screen quality
                             defaultQn?.let { vod.callMethod("setQn", it) }
                         }
+                        Log.d("PlayerMoss after: qn=${vod.callMethodAs<Long>("getQn")}")
                     }
                 }
             }
@@ -391,7 +406,13 @@ class BangumiPlayUrlHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 instance.playViewUniteReqClass,
                 instance.mossResponseHandlerClass
             ) { param ->
-                param.args[0].callMethod("getVod")?.apply {
+                val request = param.args[0]
+                val bvid = request.callMethod("getBvid") as? String
+                if (!bvid.isNullOrEmpty() && bvid != lastBvid) {
+                    lastBvid = bvid
+                    qnApplied.set(false)
+                }
+                request.callMethod("getVod")?.apply {
                     isDownload = sPrefs.getBoolean("allow_download", false)
                             && callMethodAs<Int>("getDownload") >= 1
                     if (isDownload) {
@@ -406,7 +427,10 @@ class BangumiPlayUrlHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                         // unlock available quality limit, allow quality up to 8K
                         callMethod("setFnval", MAX_FNVAL)
                         callMethod("setFourk", true)
-                        if (halfScreenQuality != 0 && qnApplied.compareAndSet(false, true)) {
+                        // qn == 0 表示自动画质；手动切清晰度时 qn != 0，不覆盖
+                        if (halfScreenQuality != 0 &&
+                            (callMethodAs<Long>("getQn") == 0L || qnApplied.compareAndSet(false, true))
+                        ) {
                             if (halfScreenQuality != 1) {
                                 callMethod("setQn", halfScreenQuality)
                             } else {
@@ -486,12 +510,17 @@ class BangumiPlayUrlHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             if (halfScreenQuality != 0 || fullScreenQuality != 0) {
                 request.callMethod("setFnval", MAX_FNVAL)
                 request.callMethod("setFourk", true)
-                if (halfScreenQuality != 0 && qnApplied.compareAndSet(false, true)) {
+                val currentQn = request.callMethodAs<Long>("getQn")
+                Log.d("PlayURLMoss playView: qn=$currentQn half=$halfScreenQuality full=$fullScreenQuality")
+                if (halfScreenQuality != 0 &&
+                    (currentQn == 0L || qnApplied.compareAndSet(false, true))
+                ) {
                     if (halfScreenQuality != 1) {
                         request.callMethod("setQn", halfScreenQuality)
                     } else {
                         defaultQn?.let { request.callMethod("setQn", it) }
                     }
+                    Log.d("PlayURLMoss after: qn=${request.callMethodAs<Long>("getQn")}")
                 }
             }
         }

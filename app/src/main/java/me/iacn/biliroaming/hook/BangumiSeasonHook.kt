@@ -142,10 +142,14 @@ class BangumiSeasonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     private val searchAllResultClass by Weak {
         "com.bilibili.search.api.SearchResultAll".findClassOrNull(
             mClassLoader
+        ) ?: "com.bilibili.search2.api.SearchResultAll".findClassOrNull(
+            mClassLoader
         )
     }
     private val searchAllResultNavInfoClass by Weak {
         "com.bilibili.search.api.SearchResultAll\$NavInfo".findClassOrNull(
+            mClassLoader
+        ) ?: "com.bilibili.search2.api.SearchResultAll\$NavInfo".findClassOrNull(
             mClassLoader
         )
     }
