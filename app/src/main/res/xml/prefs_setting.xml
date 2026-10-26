@@ -224,6 +224,12 @@
             android:summary="@string/danmaku_filter_summary"
             android:title="@string/danmaku_filter_title" />
 
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="prefer_highest_quality"
+            android:title="@string/prefer_highest_quality_title"
+            android:summary="@string/prefer_highest_quality_summary" />
+
         <Preference
             android:key="half_screen_quality"
             android:summary="@string/half_screen_quality_summary"
@@ -265,6 +271,15 @@
             android:summary="@string/remove_pause_ad_summary"
             android:title="@string/remove_pause_ad_title" />
 
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="remove_video_mentions"
+            android:title="@string/remove_video_mentions_title" />
+
+        <SwitchPreference android:defaultValue="true" android:key="hide_player_listen"
+            android:title="隐藏播放器听视频按钮" />
+        <SwitchPreference android:defaultValue="true" android:key="hide_player_portrait"
+            android:title="隐藏播放器竖屏播放按钮" />
         <SwitchPreference
             android:key="disable_auto_refresh"
             android:summary="@string/disable_auto_refresh_summary"
@@ -344,7 +359,7 @@
             android:summary="@string/purify_story_video_ad_summary"
             android:title="@string/purify_story_video_ad_title" />
         <SwitchPreference
-            android:dependency="hidden"
+            android:defaultValue="true"
             android:key="purify_game"
             android:summary="@string/purify_game_summary"
             android:title="@string/purify_game_title" />

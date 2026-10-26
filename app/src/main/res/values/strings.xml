@@ -1,4 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="prefer_highest_quality_title">打开视频优先最高画质</string>
+    <string name="prefer_highest_quality_summary">首次半屏播放即选择当前账号可用的最高画质；关闭后使用自定义半屏、全屏设置</string>
+    <string name="remove_video_mentions_title">隐藏视频提及</string>
     <string name="app_name">哔哩漫游</string>
     <string name="xposed_description">解锁B站港澳台番剧限制</string>
     <string name="about">关于</string>

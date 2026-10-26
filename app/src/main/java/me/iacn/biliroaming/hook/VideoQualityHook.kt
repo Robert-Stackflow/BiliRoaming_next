@@ -5,6 +5,7 @@ import me.iacn.biliroaming.utils.*
 
 class VideoQualityHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     override fun startHook() {
+        if (sPrefs.getBoolean("prefer_highest_quality", true)) return
         if (!sPrefs.getBoolean("main_func", false)) return
 
         val halfScreenQuality = sPrefs.getString("half_screen_quality", "0")?.toInt() ?: 0

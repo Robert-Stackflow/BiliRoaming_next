@@ -7,7 +7,8 @@ class KotlinxSplashShowProcessor : KotlinxProcessor {
         "kntr.srcs.app.splash.model.SplashShowStrategy"
 
     override fun shouldEnable() =
-        sPrefs.getBoolean("hidden", false) && sPrefs.getBoolean("purify_splash", false)
+        sPrefs.getBoolean("remove_splash_ad", true) ||
+                (sPrefs.getBoolean("hidden", false) && sPrefs.getBoolean("purify_splash", false))
 
     override fun process(result: Any) {
         try {

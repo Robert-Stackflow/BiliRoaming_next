@@ -55,8 +55,8 @@ cmaker {
 android {
     namespace = "me.iacn.biliroaming"
     compileSdk = 35
-    buildToolsVersion = "35.0.0"
-    ndkVersion = "29.0.14206865"
+    buildToolsVersion = "35.0.1"
+    ndkVersion = providers.gradleProperty("localNdkVersion").getOrElse("29.0.14206865")
 
     buildFeatures {
         prefab = true
@@ -154,6 +154,7 @@ configurations.all {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     compileOnly(libs.xposed)
     implementation(libs.protobuf.kotlin)
     implementation(libs.protobuf.java)

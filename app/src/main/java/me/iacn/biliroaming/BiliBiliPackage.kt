@@ -391,6 +391,27 @@ class BiliBiliPackage constructor(private val mClassLoader: ClassLoader, mContex
     fun addVideo() = mHookInfo.storyPagerPlayer.addVideo.orNull
 
     private fun readHookInfo(context: Context): Configs.HookInfo {
+        // The integrated 9.13 build has a fixed original APK. Loading its verified
+        // discovery result avoids a full 32-dex scan on the UI thread at first boot.
+        if (context.packageName == "tv.danmaku.bili" &&
+            getVersionCode(context.packageName) == 9130500 && getModuleGeneration(context) == 0) {
+            runCatching {
+                val source = File(context.applicationInfo.sourceDir)
+                val matches = java.util.zip.ZipFile(source).use { zip ->
+                    val original = zip.getEntry("assets/lspatch/origin.apk")
+                    if (original != null) original.crc == 1259353875L && original.size == 218480895L
+                    else source.length() == 218480895L && zip.getEntry("classes.dex")?.crc == 158807902L
+                }
+                if (matches) {
+                    val info = XposedInit.moduleRes.assets.open("bili-9.13-arm64-hookinfo.pb")
+                        .use { Configs.HookInfo.parseFrom(it) }
+                    if (info.clientVersionCode == 9130500 && info.biliAccounts.getAccessKey.orNull != null) {
+                        Log.d("Loaded verified 9.13 discovery asset; no startup dex scan")
+                        return info
+                    }
+                }
+            }.onFailure { Log.w(it) }
+        }
         try {
             val hookInfoFile = File(context.cacheDir, Constant.HOOK_INFO_FILE_NAME)
             Log.d("Reading hook info: $hookInfoFile")

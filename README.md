@@ -2,7 +2,7 @@
 
 基于原版哔哩漫游，适配新版哔哩哔哩，并提供 LSPatch 版本给无 root 用户。
 
-用户可于 [Releases](../../releases) 页面下载。
+本分支适配哔哩哔哩 9.13.0，新增半屏初始最高画质与视频提及开关，并修复暂停广告和开屏广告过滤。构建与验证见 [9.13 适配说明](docs/bilibili-9.13.md)。
 
 > 这是个人修改版，并非官方版本。使用前请阅读文末的说明与免责声明。
 
@@ -23,7 +23,7 @@
 | `*_noroot.apk` | LSPatch 整合版，**无需 root**，也无需安装 LSPatch 管理器 |
 | `BiliRoaming_*.apk` | Xposed 模块，供 root / LSPosed 用户使用 |
 
-支持的客户端：哔哩哔哩 Android **9.8.0**（`tv.danmaku.bili`，versionCode `9080300`）。
+本分支验证的客户端：哔哩哔哩 Android **9.13.0**（`tv.danmaku.bili`，versionCode `9130500`）。
 
 > 免 root 版与官方版签名不同，安装前请先卸载官方哔哩哔哩或旧版整合包，否则会提示签名冲突。
 
@@ -35,7 +35,7 @@
 
 ## 反馈与问题
 
-遇到 bug 或有功能建议，欢迎发送邮件至：**ok20090503@gmail.com**
+本分支的问题请在 [Issues](../../issues) 中反馈。
 
 > 也可以在本仓库的 Issues 中反馈。提交问题时请尽量附上：客户端版本、模块版本、复现步骤，以及日志（`Android/data/tv.danmaku.bili/cache/log.txt`）。
 

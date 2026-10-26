@@ -76,6 +76,7 @@ class ProtoBufHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     private val blockUpperRecommendAd = sPrefs.getBoolean("block_upper_recommend_ad", true)
     private val blockVideoComment = hidden && sPrefs.getBoolean("block_video_comment", false)
     private val blockViewPageAds = sPrefs.getBoolean("block_view_page_ads", true)
+    private val removeVideoMentions = sPrefs.getBoolean("remove_video_mentions", true)
 
 
     override fun startHook() {
@@ -397,8 +398,14 @@ class ProtoBufHook(classLoader: ClassLoader) : BaseHook(classLoader) {
 
         fun Any.isLikeComment() = blockCommentGuide && callMethodAs("hasLikeComment")
 
+        fun Any.isVideoMentions(): Boolean {
+            val remove = removeVideoMentions && callMethodOrNull("hasVideoMentions") == true
+            if (remove) Log.d("removed video mentions module")
+            return remove
+        }
+
         fun MutableList<Any>.filter() = removeAll {
-            it.isActivityEntranceModule() || it.isHonor() || it.isLiveOrder() || it.isUgcSeason() || it.isLikeComment()
+            it.isActivityEntranceModule() || it.isHonor() || it.isLiveOrder() || it.isUgcSeason() || it.isLikeComment() || it.isVideoMentions()
         }
 
         if (isUnite) {
@@ -418,7 +425,7 @@ class ProtoBufHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                         it.callMethodAs("hasReply")
                     }
                 }
-                if (!(blockCommentGuide || blockViewPageAds || removeHonor || removeUgcSeason)) return@run
+                if (!(blockCommentGuide || blockViewPageAds || removeHonor || removeUgcSeason || removeVideoMentions)) return@run
                 tabModuleList.firstOrNull { it.callMethod("hasIntroduction") == true }?.let {
                     it.callMethodAs<Any>("getIntroduction").run {
                         callMethod("ensureModulesIsMutable")

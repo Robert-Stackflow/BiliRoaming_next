@@ -72,8 +72,9 @@ class BangumiPlayUrlHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         if (!sPrefs.getBoolean("main_func", false)) return
         Log.d("startHook: BangumiPlayUrl")
         val blockBangumiPageAds = sPrefs.getBoolean("block_view_page_ads", false)
-        val halfScreenQuality = sPrefs.getString("half_screen_quality", "0")?.toInt() ?: 0
-        val fullScreenQuality = sPrefs.getString("full_screen_quality", "0")?.toInt() ?: 0
+        val preferHighest = sPrefs.getBoolean("prefer_highest_quality", true)
+        val halfScreenQuality = if (preferHighest) 0 else sPrefs.getString("half_screen_quality", "0")?.toInt() ?: 0
+        val fullScreenQuality = if (preferHighest) 0 else sPrefs.getString("full_screen_quality", "0")?.toInt() ?: 0
 
         instance.signQueryName()?.let {
             instance.libBiliClass?.hookBeforeMethod(it, Map::class.java) { param ->

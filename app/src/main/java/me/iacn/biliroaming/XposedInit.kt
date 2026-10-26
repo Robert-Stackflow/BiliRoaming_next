@@ -42,6 +42,9 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
         if (!Constant.BILIBILI_PACKAGE_NAME.containsValue(lpparam.packageName) &&
             "tv.danmaku.bili.MainActivityV2".findClassOrNull(lpparam.classLoader) == null
         ) return
+        lpparam.appInfo?.nativeLibraryDir?.let { directory ->
+            NativeLibraryHook(lpparam.classLoader, directory).startHook()
+        }
         Instrumentation::class.java.hookBeforeMethod(
             "callApplicationOnCreate",
             Application::class.java
@@ -113,6 +116,8 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     startHook { QualityHook(lpparam.classLoader) }
                     startHook { DynamicHook(lpparam.classLoader) }
                     startHook { ProtoBufHook(lpparam.classLoader) }
+                    startHook { VideoMentionsHook(lpparam.classLoader) }
+                    startHook { InterfaceCleanupHook(lpparam.classLoader) }
                     startHook { PlayArcConfHook(lpparam.classLoader) }
                     startHook { TryWatchVipQualityHook(lpparam.classLoader) }
                     startHook { AllowMiniPlayHook(lpparam.classLoader) }
@@ -128,6 +133,7 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     startHook { DanmakuHook(lpparam.classLoader) }
                     startHook { BangumiPageAdHook(lpparam.classLoader) }
                     startHook { VideoQualityHook(lpparam.classLoader) }
+                    startHook { InitialQualityHook(lpparam.classLoader) }
                     // startHook(PublishToFollowingHook(lpparam.classLoader))
                     startHook { UposReplaceHook(lpparam.classLoader) }
                     startHook { SpeedHook(lpparam.classLoader) }

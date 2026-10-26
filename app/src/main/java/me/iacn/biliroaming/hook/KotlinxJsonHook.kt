@@ -6,7 +6,7 @@ import me.iacn.biliroaming.hook.kotlinx.KotlinxSplashListProcessor
 import me.iacn.biliroaming.hook.kotlinx.KotlinxSplashShowProcessor
 import me.iacn.biliroaming.utils.Log
 import me.iacn.biliroaming.utils.callMethodOrNull
-import me.iacn.biliroaming.utils.getObjectFieldAs
+import me.iacn.biliroaming.utils.getObjectFieldOrNullAs
 import me.iacn.biliroaming.utils.hookAfterAllMethods
 
 class KotlinxJsonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
@@ -27,18 +27,19 @@ class KotlinxJsonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
 
         val jsonClass = instance.kotlinJsonClass ?: return
 
-        jsonClass.hookAfterAllMethods("decodeFromString") { param ->
-            dispatchResult(param.args.getOrNull(0), param.result)
+        listOf("decodeFromString", "decodeFromJsonElement").forEach { method ->
+            jsonClass.hookAfterAllMethods(method) { param ->
+                dispatchResult(param.args.getOrNull(0), param.result)
+            }
         }
     }
 
     private fun dispatchResult(deserializer: Any?, result: Any?) {
         if (deserializer == null || result == null) return
 
-        val serialName = deserializer
-            .callMethodOrNull("getDescriptor")
-            ?.getObjectFieldAs<String>("serialName")
-            ?: return
+        val descriptor = deserializer.callMethodOrNull("getDescriptor") ?: return
+        val serialName = descriptor.callMethodOrNull("getSerialName") as? String
+            ?: descriptor.getObjectFieldOrNullAs<String>("serialName") ?: return
 
         enabledProcessors[serialName]?.forEach { processor ->
             try {

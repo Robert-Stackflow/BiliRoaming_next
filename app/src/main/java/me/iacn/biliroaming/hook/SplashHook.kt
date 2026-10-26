@@ -15,6 +15,21 @@ import java.io.File
 
 class SplashHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     override fun startHook() {
+        if (sPrefs.getBoolean("remove_splash_ad", true)) {
+            // Also cover models restored from disk, which need not pass through the JSON hooks.
+            listOf("SplashListResponse", "SplashShowResponse").forEach { name ->
+                "tv.danmaku.bili.splash.ad.model.$name".findClassOrNull(mClassLoader)?.run {
+                    replaceAllMethods("getStrategyList") { ArrayList<Any>() }
+                    if (name == "SplashListResponse") {
+                        replaceAllMethods("getSplashList") { ArrayList<Any>() }
+                        replaceAllMethods("getMaxCount") { 0 }
+                    }
+                }
+            }
+            "tv.danmaku.bili.splash.ad.model.SplashShowStrategy".findClassOrNull(mClassLoader)
+                ?.replaceAllMethods("getSplashContent") { null }
+            Log.d("startHook: SplashAd cache and response filtering")
+        }
         // 解除 AbstractComposeView 的 addView 限制，使其恢复普通 ViewGroup 行为
         if (!composeAddViewPatched) {
             try {

@@ -126,8 +126,7 @@ class JsonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
 
                     configTab(data, tabClass)
 
-                    if (sPrefs.getBoolean("purify_game", false) &&
-                        sPrefs.getBoolean("hidden", false)
+                    if (sPrefs.getBoolean("purify_game", true)
                     ) {
                         val top = data?.getObjectFieldAs<MutableList<*>?>("top")
                         top?.removeAll {
@@ -273,8 +272,8 @@ class JsonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                         }
                     }
                 }
-                splashClass, splashShowClass -> if (sPrefs.getBoolean("purify_splash", false) &&
-                    sPrefs.getBoolean("hidden", false)
+                splashClass, splashShowClass -> if (sPrefs.getBoolean("remove_splash_ad", true) ||
+                    (sPrefs.getBoolean("purify_splash", false) && sPrefs.getBoolean("hidden", false))
                 ) {
                     result.getObjectFieldOrNullAs<MutableList<*>>("splashList")?.clear()
                     result.getObjectFieldOrNullAs<MutableList<*>>("strategyList")?.clear()

@@ -7,7 +7,8 @@ class KotlinxSplashListProcessor : KotlinxProcessor {
         "kntr.srcs.app.splash.model.SplashListResponse"
 
     override fun shouldEnable() =
-        sPrefs.getBoolean("hidden", false) && sPrefs.getBoolean("purify_splash", false)
+        sPrefs.getBoolean("remove_splash_ad", true) ||
+                (sPrefs.getBoolean("hidden", false) && sPrefs.getBoolean("purify_splash", false))
 
     override fun process(result: Any) {
         try {
@@ -15,7 +16,7 @@ class KotlinxSplashListProcessor : KotlinxProcessor {
                 .filter { MutableList::class.java.isAssignableFrom(it.type) }
                 .forEach { field ->
                     field.isAccessible = true
-                    (field.get(result) as? MutableList<*>)?.clear()
+                    field.set(result, ArrayList<Any>())
                 }
         } catch (_: Throwable) {}
     }
