@@ -7,6 +7,11 @@ class InitialQualityPolicy {
     }
 
     @Synchronized
+    fun markPlayback(cid: Long) {
+        if (cid > 0) seen[cid] = Unit
+    }
+
+    @Synchronized
     fun shouldOverride(cid: Long, qn: Long, download: Int): Boolean {
         if (cid <= 0 || download != 0) return false
         val first = seen.put(cid, Unit) == null

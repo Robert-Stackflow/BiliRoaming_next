@@ -27,6 +27,13 @@ class PlaybackRegressionTest {
         assertTrue(policy.shouldOverride(1, 64, 0))
     }
 
+    @Test fun cachedPlaybackDoesNotTurnNextManualChangeIntoInitialRequest() {
+        val policy = InitialQualityPolicy()
+        policy.markPlayback(1)
+        assertFalse(policy.shouldOverride(1, 32, 0))
+        assertTrue(policy.shouldOverride(2, 64, 0))
+    }
+
     class SplashResponse {
         @JvmField var items: List<String> = listOf("cached-ad")
         @JvmField var requestId: String = "keep"

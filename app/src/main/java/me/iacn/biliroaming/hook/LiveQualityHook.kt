@@ -23,11 +23,32 @@ class LiveQualityHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     }
 
     override fun startHook() {
-        val liveQuality = sPrefs.getString("live_quality", "0")?.toIntOrNull() ?: 0
+        val codec = sPrefs.getString("preferred_live_codec", "auto")
+        if (codec == "hevc" || codec == "avc") {
+            "com.bilibili.bililive.liveplayer.params.LiveFastPlayUrlSelector".findClassOrNull(mClassLoader)?.let { selector ->
+                selector.replaceAllMethods("supportAV1") { false }
+                if (codec == "avc") selector.replaceAllMethods("supportH265") { false }
+            }
+        }
+        val highest = sPrefs.getBoolean("prefer_highest_live_quality", true)
+        val liveQuality = if (highest) Int.MAX_VALUE else sPrefs.getString("live_quality", "0")?.toIntOrNull() ?: 0
+        val requestedDefault = if (highest) 30000 else liveQuality
+        val line = sPrefs.getString("preferred_live_line", "0")?.toIntOrNull() ?: 0
+        if (line > 0) {
+            "com.bilibili.bililive.blps.liveplayer.apis.beans.url.v2.LivePlayUrlV2".findClassOrNull(mClassLoader)?.let { model ->
+                listOf("getFlvUrls", "getHlsUrls", "getMp4Url").forEach { method ->
+                    model.hookAfterAllMethods(method) { param ->
+                        val urls = param.result as? List<*> ?: return@hookAfterAllMethods
+                        if (line < urls.size) param.result = ArrayList(urls).apply { add(0, removeAt(line)) }
+                    }
+                }
+            }
+        }
         if (liveQuality <= 0) {
             return
         }
 
+        Log.d("LiveQuality initial target=" + if (highest) "highest" else liveQuality)
         val canSwitchLiveRoom = !sPrefs.getBoolean("forbid_switch_live_room", false)
 
         instance.defaultRequestInterceptClass?.hookBeforeAllMethods(instance.interceptMethod()) { param ->
@@ -46,11 +67,13 @@ class LiveQualityHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 val builder = uri.buildUpon().clearQuery()
                 for (name in uri.queryParameterNames) {
                     if (name == "qn") {
-                        builder.appendQueryParameter(name, newQn.ifEmpty { liveQuality.toString() })
+                        builder.appendQueryParameter(name, newQn.ifEmpty { requestedDefault.toString() })
                     } else {
                         builder.appendQueryParameter(name, uri.getQueryParameter(name))
                     }
                 }
+                if ("qn" !in uri.queryParameterNames) builder.appendQueryParameter("qn", newQn.ifEmpty { requestedDefault.toString() })
+                Log.d("LiveQuality requested=" + newQn.ifEmpty { requestedDefault.toString() })
                 val newHttpUrl = instance.httpUrlClass?.callStaticMethod(
                     instance.httpUrlParseMethod(),
                     builder.build().toString()
@@ -84,12 +107,19 @@ class LiveQualityHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                     }
                 }
 
-                BuildConfig.DEBUG && url.startsWith("https://api.live.bilibili.com/xlive/app-room/v2/index/getRoomPlayInfo?") -> {
+                url.startsWith("https://api.live.bilibili.com/xlive/app-room/v2/index/getRoomPlayInfo?") -> {
                     val data = body.getObjectField("data") ?: return@hookBeforeAllConstructors
                     val info = JSONObject(
                         instance.fastJsonClass?.callStaticMethod("toJSONString", data).toString()
                     )
-                    printCodec(info)
+                    val play = info.optJSONObject("playurl_info")?.optJSONObject("playurl")
+                    val qns = ArrayList<Int>()
+                    play?.optJSONArray("stream")?.iterator()?.forEach { stream ->
+                        stream.optJSONArray("format")?.iterator()?.forEach { format ->
+                            format.optJSONArray("codec")?.iterator()?.forEach { codec -> qns.add(codec.optInt("current_qn")) }
+                        }
+                    }
+                    Log.d("LiveQuality returned=" + qns.distinct().joinToString())
                 }
             }
         }
@@ -113,10 +143,10 @@ class LiveQualityHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             debug { "originalLiveUrl: $originalUri" }
 
             if (originalUri.getQueryParameter("no_playurl") == "1") {
-                newQn = liveQuality.toString()
+                newQn = requestedDefault.toString()
             } else {
                 newQn = findQuality(
-                    JSONArray(originalUri.getQueryParameter("accept_quality")),
+                    JSONArray(originalUri.getQueryParameter("accept_quality") ?: "[]"),
                     liveQuality
                 ).toString()
 
@@ -142,6 +172,7 @@ class LiveQualityHook(classLoader: ClassLoader) : BaseHook(classLoader) {
 
     private fun findQuality(acceptQuality: JSONArray, expectQuality: Int): Int {
         val acceptQnList = acceptQuality.asSequence<Int>().sorted().toList()
+        if (acceptQnList.isEmpty()) return if (expectQuality == Int.MAX_VALUE) 30000 else expectQuality
         val max = acceptQnList.max()
         val min = acceptQnList.min()
         return when {

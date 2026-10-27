@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="auto_quality_entries">
+        <item>最高可用画质</item><item>8K</item><item>杜比视界</item><item>HDR</item><item>4K</item>
+        <item>1080P 60帧</item><item>1080P 高码率</item><item>1080P</item><item>720P 60帧</item><item>720P</item><item>480P</item><item>360P</item>
+    </string-array>
+    <string-array name="auto_quality_values">
+        <item>highest</item><item>127</item><item>126</item><item>125</item><item>120</item>
+        <item>116</item><item>112</item><item>80</item><item>74</item><item>64</item><item>32</item><item>16</item>
+    </string-array>
+    <string-array name="auto_live_line_entries"><item>自动／主线</item><item>备用线路 1</item><item>备用线路 2</item></string-array>
+    <string-array name="auto_live_line_values"><item>0</item><item>1</item><item>2</item></string-array>
+    <string-array name="auto_codec_entries"><item>自动</item><item>AV1</item><item>HEVC</item><item>AVC</item></string-array>
+    <string-array name="auto_codec_values"><item>auto</item><item>av1</item><item>hevc</item><item>avc</item></string-array>
+</resources>

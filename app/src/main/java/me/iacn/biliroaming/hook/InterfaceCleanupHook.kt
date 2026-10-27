@@ -3,6 +3,7 @@ package me.iacn.biliroaming.hook
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import de.robv.android.xposed.XposedBridge
 import me.iacn.biliroaming.utils.*
 
 /** View IDs and toolbar item types from the official 9.13.0 resources. */
@@ -22,9 +23,12 @@ class InterfaceCleanupHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         }
         if (game) ids.addAll(listOf(0x7f093338, 0x7f09487d, 0x7f095be1)) // home game containers
         val reported = HashSet<Int>()
+        val baseVisibility = View::class.java.getDeclaredMethod("setVisibility", Int::class.javaPrimitiveType!!)
         fun hide(view: View) {
             if (view.id !in ids) return
-            view.visibility = View.GONE
+            // Inflation can finish before Gemini initializes its controller.
+            // Its override accesses lateinit fields; use the base View operation.
+            XposedBridge.invokeOriginalMethod(baseVisibility, view, arrayOf(View.GONE))
             if (reported.add(view.id)) Log.d("InterfaceCleanup hidden ${view.resources.getResourceEntryName(view.id)}")
         }
         if (ids.isNotEmpty()) {

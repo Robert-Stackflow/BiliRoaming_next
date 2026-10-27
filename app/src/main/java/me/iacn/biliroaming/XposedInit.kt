@@ -59,7 +59,7 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     Log.d("BiliRoaming version: ${BuildConfig.VERSION_NAME}(${BuildConfig.VERSION_CODE}) from $modulePath${if (isBuiltIn) "(BuiltIn)" else ""}")
                     Log.d("Bilibili version: ${getPackageVersion(lpparam.packageName)} (${if (is64) "64" else "32"}bit)")
                     Log.d("SDK: ${Build.VERSION.RELEASE}(${Build.VERSION.SDK_INT}); Phone: ${Build.BRAND} ${Build.MODEL}")
-                    Log.d("Config: ${sPrefs.all}")
+                    Log.d("Loaded ${sPrefs.all.size} configuration entries")
                     XposedBridge.log(
                         "BiliRoaming ${BuildConfig.VERSION_NAME} loaded in ${lpparam.processName}, " +
                                 "bilibili ${getPackageVersion(lpparam.packageName)}"

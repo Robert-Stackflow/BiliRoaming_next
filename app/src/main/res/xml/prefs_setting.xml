@@ -230,6 +230,32 @@
             android:title="@string/prefer_highest_quality_title"
             android:summary="@string/prefer_highest_quality_summary" />
 
+        <SwitchPreference android:defaultValue="true" android:key="prefer_highest_frame_rate"
+            android:title="同分辨率优先最高帧率" android:summary="选择最高画质时，同分辨率优先 60／120 帧等高帧率片源" />
+        <ListPreference android:defaultValue="highest" android:key="preferred_video_quality"
+            android:entries="@array/auto_quality_entries" android:entryValues="@array/auto_quality_values"
+            android:title="首选画质" android:summary="在当前账号和片源可用的档位中选择" />
+        <ListPreference android:defaultValue="highest" android:key="fallback_video_quality"
+            android:entries="@array/auto_quality_entries" android:entryValues="@array/auto_quality_values"
+            android:title="备选画质" android:summary="首选不可用时选择此档，再回退到最高可用档" />
+        <SwitchPreference android:defaultValue="true" android:key="enable_8k_quality" android:title="请求 8K 片源" />
+        <SwitchPreference android:defaultValue="false" android:key="enable_hdr_quality" android:title="自动选择 HDR" />
+        <SwitchPreference android:defaultValue="false" android:key="enable_dolby_vision" android:title="自动选择杜比视界" />
+        <ListPreference android:defaultValue="auto" android:key="preferred_video_codec"
+            android:entries="@array/auto_codec_entries" android:entryValues="@array/auto_codec_values"
+            android:title="视频编码偏好" android:summary="首选不可用时使用客户端支持的其他编码" />
+        <SwitchPreference android:defaultValue="true" android:key="auto_audio_quality" android:title="自动选择最高音质" />
+        <SwitchPreference android:defaultValue="true" android:key="prefer_lossless_audio" android:title="自动选择无损音频" />
+        <SwitchPreference android:defaultValue="true" android:key="prefer_dolby_audio"
+            android:title="自动选择杜比全景声" android:summary="同时开启时优先杜比，其次无损，再回退到普通音轨" />
+        <SwitchPreference android:defaultValue="true" android:key="prefer_highest_live_quality" android:title="直播自动最高画质" />
+        <ListPreference android:defaultValue="auto" android:key="preferred_live_codec"
+            android:entries="@array/auto_codec_entries" android:entryValues="@array/auto_codec_values"
+            android:title="直播编码偏好" />
+        <ListPreference android:defaultValue="0" android:key="preferred_live_line"
+            android:entries="@array/auto_live_line_entries" android:entryValues="@array/auto_live_line_values"
+            android:title="直播首选线路" android:summary="优先选定线路，保留其他线路供播放失败时回退" />
+
         <Preference
             android:key="half_screen_quality"
             android:summary="@string/half_screen_quality_summary"
