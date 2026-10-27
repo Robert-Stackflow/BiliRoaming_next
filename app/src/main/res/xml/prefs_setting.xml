@@ -63,6 +63,9 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/beautify_category">
+        <ListPreference android:key="video_detail_transition" android:defaultValue="original"
+            android:entries="@array/detail_transition_entries" android:entryValues="@array/detail_transition_values"
+            android:title="视频详情动画" android:summary="%s" />
         <SwitchPreference
             android:key="custom_theme"
             android:summary="@string/custom_theme_summary"

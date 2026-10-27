@@ -122,6 +122,7 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     startHook { TryWatchVipQualityHook(lpparam.classLoader) }
                     startHook { AllowMiniPlayHook(lpparam.classLoader) }
                     startHook { StartActivityHook(lpparam.classLoader) }
+                    startHook { DetailTransitionHook(lpparam.classLoader) }
                     startHook { FullStoryHook(lpparam.classLoader) }
                     startHook { DialogBlurBackgroundHook(lpparam.classLoader) }
                     startHook { PlayerLongPressHook(lpparam.classLoader) }

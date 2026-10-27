@@ -23,11 +23,13 @@
 | 隐藏播放器竖屏播放按钮 | `hide_player_portrait` | 关闭详情页竖屏入口配置，兼容旧播放器的入口视图 |
 | 净化游戏中心 | `purify_game` | 过滤首页游戏入口，不再要求同时开启隐藏功能 |
 | 屏蔽视频详情页广告 | `block_view_page_ads` | 额外清空播放器下方广告卡片的两个数据来源，覆盖刷新后的展示 |
+| 视频详情动画 | `video_detail_transition` | 默认不修改；可选择恢复系统默认，覆盖普通详情页和连播详情页 |
 
 最高画质仍受账号权限、视频片源和实际返回的播放资源限制。关闭最高画质开关后，恢复原有半屏、全屏画质设置逻辑。
 最高画质模式同时禁用半屏画质替换和 DASH 自动降档；网络较慢时可能需要更多缓冲。明确的手动低画质选择仍保留。
 初始原生媒体资产的重试候选列表也会过滤未启用的 HDR / 杜比视界档位，防止解码或网络重试重新切回这些片源。手动选择的播放响应保留原候选列表。
 菜单样式修改已撤回，分享、推荐列表和图片页面继续使用原有菜单。
+Hero 动画及其设置项已删除。旧版选择 Hero 的配置按“不修改”处理，打开设置时迁移到默认值。导航模块只在选择“恢复系统默认”时启用。
 
 ## 稳定性
 
@@ -44,7 +46,7 @@
 ```sh
 git submodule update --init --recursive
 ./gradlew :app:testDebugUnitTest :app:assembleRelease \
-  -PlocalNdkVersion=30.0.14904198 -PappVerName=9.13-local-r24 --no-daemon
+  -PlocalNdkVersion=30.0.14904198 -PappVerName=9.13-local-r33 --no-daemon
 ```
 
 签名属性为 `releaseStoreFile`、`releaseStorePassword`、`releaseKeyAlias`、`releaseKeyPassword`，通过本地 Gradle 属性或 `ORG_GRADLE_PROJECT_` 环境变量提供。不要提交密钥、密码、原版 APK、反编译结果或真机日志。
@@ -54,6 +56,7 @@ git submodule update --init --recursive
 ## 验证
 
 11 项 JVM 回归测试通过，覆盖首个请求与手动选档、缓存播放、预加载交错、本地下载、开屏列表可变性，以及视频分辨率/帧率、首选回退、SDR 默认、音轨优先级。
+r33 已在同一真机覆盖安装，完成旧选项迁移、详情页打开和返回检查，未记录到致命异常或 Hook 错误。Release 模块确认不再包含此前的快照动画、共享元素或渲染线程动画实现；签名、非 debuggable 和整合包内嵌模块一致性检查通过。
 
 此前版本 Android 16 / 小米 23127PN0CC 真机验证：暂停等待 8 秒未出现广告或倒计时；视频提及、顶部听视频/竖屏入口和播放器下方广告已过滤。菜单样式继续保持原样。
 

@@ -74,6 +74,9 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
             super.onCreate(savedInstanceState)
             preferenceManager.sharedPreferencesName = "biliroaming"
             prefs = preferenceManager.sharedPreferences
+            if (prefs.getString("video_detail_transition", "original") == "hero") {
+                prefs.edit().putString("video_detail_transition", "original").apply()
+            }
             checkUposServer()
             addPreferencesFromResource(R.xml.prefs_setting)
             biliprefs = currentContext.getSharedPreferences(
