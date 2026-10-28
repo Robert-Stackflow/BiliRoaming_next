@@ -57,6 +57,7 @@ class PegasusHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         sPrefs.getStringSet("home_filter_keywords_channel", null).orEmpty()
     }
     private val disableAutoRefresh = sPrefs.getBoolean("disable_auto_refresh", false)
+    private val refreshConfigClasses = java.util.concurrent.ConcurrentHashMap.newKeySet<Class<*>>()
     private val removeRelatePromote = sPrefs.getBoolean("remove_video_relate_promote", true)
     private val removeRelateOnlyAv = sPrefs.getBoolean("remove_video_relate_only_av", false)
     private val removeRelateNothing = sPrefs.getBoolean("remove_video_relate_nothing", false)
@@ -331,20 +332,9 @@ class PegasusHook(classLoader: ClassLoader) : BaseHook(classLoader) {
 
     private fun Any.disableAutoRefresh() {
         if (!disableAutoRefresh) return
-        // only exist on android and android_i now
-        runCatchingOrNull {
-            setLongField("autoRefreshTimeByActive", -1L)
-            setLongField("autoRefreshTimeByAppear", -1L)
-            setIntField("autoRefreshTimeByBehavior", -1)
-        }
-        // only exist on android now
-        runCatchingOrNull {
-            setIntField("autoRefreshByBehavior", -1)
-        }
-        // only exist on android_hd now
-        runCatchingOrNull {
-            setIntField("auto_refresh_time", 0)
-        }
+        val count = HomeRefreshPolicy.disable(this)
+        if (count > 0 && refreshConfigClasses.add(javaClass))
+            Log.d("HomeRefresh disabled $count config fields on ${javaClass.name}")
     }
 
     private fun Any.customSmallCoverWhRatio() {
@@ -520,8 +510,37 @@ class PegasusHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         return isLowCountVideoPopular(obj) || durationVideoPopular(obj) || isContainsBlockKwdPopular(obj, base)
     }
 
+    private fun hookAutomaticRefresh() {
+        // Cached feeds can bypass the HTTP converter. Patch configs when read too.
+        "com.bilibili.pegasus.data.base.PegasusResponse".findClassOrNull(mClassLoader)
+            ?.hookAfterAllMethods("getConfig") { it.result?.disableAutoRefresh() }
+        val flush = "com.bilibili.pegasus.data.request.PegasusFlush".findClassOrNull(mClassLoader)
+            ?: return
+        val block: Hooker = { param ->
+            val reason = param.args.firstOrNull { flush.isInstance(it) } as? Enum<*>
+            if (HomeRefreshPolicy.blocks(reason?.name)) {
+                Log.d("HomeRefresh blocked ${reason?.name}")
+                param.result = null
+            }
+        }
+        // Do not alter first load, pull to refresh, pagination, tab taps or login changes.
+        "com.bilibili.pegasus.components.AutoRefreshComponent".findClassOrNull(mClassLoader)
+            ?.declaredMethods?.filter {
+                !java.lang.reflect.Modifier.isStatic(it.modifiers) &&
+                    it.returnType == Void.TYPE && it.parameterTypes.contentEquals(arrayOf(flush))
+            }?.forEach { it.hookBeforeMethod(hooker = block) }
+        "com.bilibili.pegasus.vm.PegasusViewModel".findClassOrNull(mClassLoader)?.let { model ->
+            model.declaredMethods.filter {
+                java.lang.reflect.Modifier.isStatic(it.modifiers) && it.returnType == Void.TYPE &&
+                    it.parameterTypes.take(3) == listOf(model, Boolean::class.javaPrimitiveType, flush)
+            }.forEach { it.hookBeforeMethod(hooker = block) }
+        }
+        Log.d("HomeRefresh automatic dispatch guards installed")
+    }
+
     override fun startHook() {
         Log.d("startHook: Pegasus")
+        if (disableAutoRefresh) hookAutomaticRefresh()
 
         fun hookPegasusFeedConvert(json: JsonHelper) {
             json.getObjectOrNull("config")?.apply {

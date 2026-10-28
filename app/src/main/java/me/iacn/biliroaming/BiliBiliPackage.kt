@@ -391,23 +391,29 @@ class BiliBiliPackage constructor(private val mClassLoader: ClassLoader, mContex
     fun addVideo() = mHookInfo.storyPagerPlayer.addVideo.orNull
 
     private fun readHookInfo(context: Context): Configs.HookInfo {
-        // The integrated 9.13 build has a fixed original APK. Loading its verified
-        // discovery result avoids a full 32-dex scan on the UI thread at first boot.
-        if (context.packageName == "tv.danmaku.bili" &&
-            getVersionCode(context.packageName) == 9130500 && getModuleGeneration(context) == 0) {
+        // Pinned original APKs have verified discovery assets. The outer LSPatch
+        // versionCode may be raised for a data-preserving downgrade; match the
+        // original APK fingerprint, never the outer versionCode alone.
+        if (context.packageName == "tv.danmaku.bili" && getModuleGeneration(context) == 0) {
             runCatching {
                 val source = File(context.applicationInfo.sourceDir)
-                val matches = java.util.zip.ZipFile(source).use { zip ->
+                val known = listOf(
+                    BundledDiscovery(9120300, 216917946L, 142304336L, 777100068L, "bili-9.12-arm64-hookinfo.pb"),
+                    BundledDiscovery(9130500, 218480895L, 1259353875L, 158807902L, "bili-9.13-arm64-hookinfo.pb"),
+                )
+                val match = java.util.zip.ZipFile(source).use { zip ->
                     val original = zip.getEntry("assets/lspatch/origin.apk")
-                    if (original != null) original.crc == 1259353875L && original.size == 218480895L
-                    else source.length() == 218480895L && zip.getEntry("classes.dex")?.crc == 158807902L
+                    known.firstOrNull {
+                        if (original != null) original.crc == it.crc && original.size == it.size
+                        else source.length() == it.size && zip.getEntry("classes.dex")?.crc == it.dexCrc
+                    }
                 }
-                if (matches) {
-                    val info = XposedInit.moduleRes.assets.open("bili-9.13-arm64-hookinfo.pb")
+                if (match != null) {
+                    val info = XposedInit.moduleRes.assets.open(match.asset)
                         .use { Configs.HookInfo.parseFrom(it) }
-                    if (info.clientVersionCode == 9130500 && info.biliAccounts.getAccessKey.orNull != null) {
-                        Log.d("Loaded verified 9.13 discovery asset; no startup dex scan")
-                        return info
+                    if (info.clientVersionCode == match.versionCode && info.biliAccounts.getAccessKey.orNull != null) {
+                        Log.d("Loaded verified ${match.asset}; no startup dex scan")
+                        return info.toBuilder().setClientVersionCode(getVersionCode(context.packageName)).build()
                     }
                 }
             }.onFailure { Log.w(it) }
@@ -454,6 +460,10 @@ class BiliBiliPackage constructor(private val mClassLoader: ClassLoader, mContex
             }
         }
     }
+
+    private data class BundledDiscovery(
+        val versionCode: Int, val size: Long, val crc: Long, val dexCrc: Long, val asset: String,
+    )
 
     companion object {
         @JvmStatic

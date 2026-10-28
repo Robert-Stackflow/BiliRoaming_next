@@ -131,7 +131,7 @@ class JsonHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                         val top = data?.getObjectFieldAs<MutableList<*>?>("top")
                         top?.removeAll {
                             val uri = it?.getObjectFieldAs<String?>("uri")
-                            uri?.startsWith("bilibili://game_center/home") ?: false
+                            HomeMenuPolicy.isGameCenter(uri)
                         }
                     }
 
